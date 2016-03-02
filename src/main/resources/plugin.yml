@@ -1,0 +1,117 @@
+name: Ticket
+description: Ticket system
+author: StarTux
+version: 0.2
+main: com.winthier.ticket.TicketPlugin
+database: true
+depend: []
+commands:
+  Ticket:
+    description: General purpose command interface
+    usage: |-
+      &3/Ticket &bNew <&oMessage&b> &8- &7Create a new ticket.
+      &3/Ticket &bView <&oID&b> &8- &7View ticket information.
+      &3/Ticket &bComment <&oID&b> <&oMessage&b> &8- &7Comment on a ticket.
+      &3/Ticket &bClose <&oID&b> [&oMessage&b] &8-&7Close a ticket.
+      &3/Ticket &bReopen <&oID&b> [&oMessage&b] &8- &7Reopen a closed ticket.
+      &3/Ticket &bPort <&oID&b> &8- &7Port to a ticket.
+      &3/Ticket &bAssign <&oID&b> <&oAssignee&b> &8- &7Assign a ticket.
+      &3/Ticket &bReload &8- &7Reload configuration.
+    permission: ticket.ticket
+permissions:
+  ticket.*:
+    description: All permissions.
+    default: false
+    children:
+      ticket.ticket: true
+      ticket.view: true
+      ticket.view.any: true
+      ticket.new: true
+      ticket.moderation: true
+      ticket.notify: true
+      ticket.comment: true
+      ticket.comment.any: true
+      ticket.close: true
+      ticket.close.any: true
+      ticket.reopen: true
+      ticket.reopen.any: true
+      ticket.port: true
+      ticket.assign: true
+      ticket.reload: true
+      ticket.reminder: true
+  ticket.moderator:
+    description: All moderation permissions.
+    default: false
+    children:
+      ticket.ticket: true
+      ticket.view: true
+      ticket.view.any: true
+      ticket.new: true
+      ticket.moderation: true
+      ticket.notify: true
+      ticket.comment: true
+      ticket.comment.any: true
+      ticket.close: true
+      ticket.close.any: true
+      ticket.reopen: true
+      ticket.reopen.any: true
+      ticket.port: true
+      ticket.assign: true
+  ticket.player:
+    description: All player permissions.
+    default: false
+    children:
+      ticket.ticket: true
+      ticket.view: true
+      ticket.new: true
+      ticket.comment: true
+      ticket.close: true
+      ticket.reopen: true
+  ticket.ticket:
+    description: Use the "/ticket" command.
+    default: op
+  ticket.view:
+    description: View ticket information.
+    default: op
+  ticket.view.any:
+    description: View information of tickets you do not own.
+    default: op
+  ticket.new:
+    description: Create a new ticket.
+    default: op
+  ticket.moderation:
+    description: List open tickets.
+    default: op
+  ticket.notify:
+    description: Receive ticket notifications.
+    default: op
+  ticket.comment:
+    description: Comment on tickets.
+    default: op
+  ticket.comment.any:
+    description: Comment on tickets other than your own.
+    default: op
+  ticket.close:
+    description: Close your own tickets.
+    default: op
+  ticket.close.any:
+    description: Close tickets that are not your own.
+    default: op
+  ticket.reopen:
+    description: Reopen your own closed tickets.
+    default: op
+  ticket.reopen.any:
+    description: Reopen tickets that are not your own.
+    default: op
+  ticket.port:
+    description: Port to a ticket location.
+    default: op
+  ticket.assign:
+    description: Assign a ticket.
+    default: op
+  ticket.reload:
+    description: Reload the configuration.
+    default: op
+  ticket.reminder:
+    description: Send out a reminder.
+    default: op
