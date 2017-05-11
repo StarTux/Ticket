@@ -3,7 +3,7 @@ description: Ticket system
 author: StarTux
 version: 0.2
 main: com.winthier.ticket.TicketPlugin
-depend: [ SQL ]
+depend: [ SQL, PlayerCache ]
 commands:
   Ticket:
     description: General purpose command interface

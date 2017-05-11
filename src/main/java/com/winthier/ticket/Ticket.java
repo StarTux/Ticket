@@ -1,8 +1,10 @@
 package com.winthier.ticket;
 
+import com.winthier.playercache.PlayerCache;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
@@ -20,6 +22,8 @@ import org.bukkit.util.NumberConversions;
 public final class Ticket {
     @Id
     private Integer id;
+
+    private UUID ownerUuid;
 
     @Column(nullable = false, length = 16)
     private String ownerName;
@@ -48,6 +52,7 @@ public final class Ticket {
     @Column(nullable = false)
     private String message;
 
+    private UUID assigneeUuid;
     private String assigneeName;
 
     private Date createTime;
@@ -69,15 +74,33 @@ public final class Ticket {
     }
 
     public void setOwner(Player player) {
+        setOwnerUuid(player.getUniqueId());
         setOwnerName(player.getName());
     }
 
     public Player getOwner() {
+        if (ownerUuid != null) return Bukkit.getServer().getPlayer(ownerUuid);
         return Bukkit.getServer().getPlayerExact(ownerName);
     }
 
     public boolean isOwner(CommandSender sender) {
         return sender.getName().equalsIgnoreCase(ownerName);
+    }
+
+    public String getOwnerName() {
+        if (ownerUuid != null) {
+            String result = PlayerCache.nameForUuid(ownerUuid);
+            if (result != null) return result;
+        }
+        return ownerName;
+    }
+
+    public String getAssigneeName() {
+        if (assigneeUuid != null) {
+            String result = PlayerCache.nameForUuid(assigneeUuid);
+            if (result != null) return result;
+        }
+        return assigneeName;
     }
 
     /**
@@ -98,16 +121,18 @@ public final class Ticket {
         setYaw(location.getYaw());
     }
 
-    public void setAssignee(CommandSender sender) {
-        this.assigneeName = sender.getName();
+    public void setAssignee(Player player) {
+        setAssigneeUuid(player.getUniqueId());
+        setAssigneeName(player.getName());
     }
 
     public boolean isAssigned() {
         return assigneeName != null;
     }
 
-    public boolean isAssigned(CommandSender sender) {
-        return sender.getName().equalsIgnoreCase(assigneeName);
+    public boolean isAssigned(Player player) {
+        if (assigneeUuid != null) return player.getUniqueId().equals(assigneeUuid);
+        return player.getName().equalsIgnoreCase(assigneeName);
     }
 
     public void sendShortInfo(CommandSender sender, boolean verbose) {

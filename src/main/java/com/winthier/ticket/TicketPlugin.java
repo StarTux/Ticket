@@ -1,6 +1,7 @@
 package com.winthier.ticket;
 
 import com.avaje.ebean.Expr;
+import com.winthier.playercache.PlayerCache;
 import com.winthier.sql.SQLDatabase;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -10,6 +11,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import javax.persistence.PersistenceException;
 import lombok.Getter;
 import org.bukkit.Bukkit;
@@ -95,6 +97,51 @@ public class TicketPlugin extends JavaPlugin implements Listener {
                 reload(sender, Arrays.<String>copyOfRange(args, 1, args.length));
             } else if ("Reminder".equalsIgnoreCase(args[0])) {
                 reminder(sender, Arrays.<String>copyOfRange(args, 1, args.length));
+            } else if ("Migrate".equalsIgnoreCase(args[0]) && sender.isOp()) {
+                int ticketsWithoutOwner = 0;
+                int ticketsWithFoundOwner = 0;
+                int ticketsWithoutAssignee = 0;
+                int ticketsWithFoundAssignee = 0;
+                for (Ticket ticket: db.find(Ticket.class).findList()) {
+                    boolean shouldSave = false;
+                    if (ticket.getOwnerUuid() == null) {
+                        ticketsWithoutOwner += 1;
+                        UUID uuid = PlayerCache.uuidForName(ticket.getOwnerName());
+                        if (uuid != null) {
+                            ticketsWithFoundOwner += 1;
+                            ticket.setOwnerUuid(uuid);
+                            shouldSave = true;
+                        }
+                    }
+                    if (ticket.getAssigneeUuid() == null && ticket.isAssigned()) {
+                        ticketsWithoutAssignee += 1;
+                        UUID uuid = PlayerCache.uuidForName(ticket.getAssigneeName());
+                        if (uuid != null) {
+                            ticketsWithFoundAssignee += 1;
+                            ticket.setAssigneeUuid(uuid);
+                            shouldSave = true;
+                        }
+                    }
+                    if (shouldSave) db.save(ticket);
+                }
+                int commentsWithoutCommenter = 0;
+                int commentsWithFoundCommenter = 0;
+                for (Comment comment: db.find(Comment.class).findList()) {
+                    boolean shouldSave = false;
+                    if (comment.getCommenterUuid() == null) {
+                        commentsWithoutCommenter += 1;
+                        UUID uuid = PlayerCache.uuidForName(comment.getCommenterName());
+                        if (uuid != null) {
+                            commentsWithFoundCommenter += 1;
+                            comment.setCommenterUuid(uuid);
+                            shouldSave = true;
+                        }
+                    }
+                    if (shouldSave) db.save(comment);
+                }
+                sender.sendMessage(String.format("%d/%d Ticket owners found", ticketsWithFoundOwner, ticketsWithoutOwner));
+                sender.sendMessage(String.format("%d/%d Ticket assignees found", ticketsWithFoundAssignee, ticketsWithoutAssignee));
+                sender.sendMessage(String.format("%d/%d Commenters found", commentsWithFoundCommenter, commentsWithoutCommenter));
             } else {
                 sendUsageMessage(sender);
             }
@@ -330,7 +377,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         //Util.sendMessage(player, ticket.getInfo());
         // Assign
         if (!ticket.isAssigned()) {
-            ticket.setAssignee(sender);
+            ticket.setAssignee(player);
             db.save(ticket);
             ticket.notifyOwner("&3%s was assigned to your ticket.", ticket.getAssigneeName());
             notify(sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
@@ -341,6 +388,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         assertPermission(sender, "ticket.assign");
         if (args.length < 2) throw new UsageException("assign");
         Ticket ticket = ticketById(args[0]);
+        ticket.setAssigneeUuid(PlayerCache.uuidForName(compileMessage(args, 1)));
         ticket.setAssigneeName(compileMessage(args, 1));
         db.save(ticket);
         Util.sendMessage(sender, "&bAssigned %s to ticket &3[&b%d&3]&b.", ticket.getAssigneeName(), ticket.getId());
