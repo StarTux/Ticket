@@ -212,11 +212,4 @@ public final class Ticket {
         sb.append(Util.format("\n&3 Status: &b%s", (isOpen() ? "Open" : "Closed")));
         return sb.toString();
     }
-
-    public boolean notifyOwner(String message, Object... args) {
-        Player owner = getOwner();
-        if (owner == null) return false;
-        Util.sendMessage(owner, message, args);
-        return true;
-    }
 }
