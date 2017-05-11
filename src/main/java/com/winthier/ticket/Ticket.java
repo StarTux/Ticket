@@ -1,15 +1,14 @@
 package com.winthier.ticket;
 
-import com.avaje.ebean.annotation.CreatedTimestamp;
-import com.avaje.ebean.validation.Length;
-import com.avaje.ebean.validation.NotEmpty;
-import com.avaje.ebean.validation.NotNull;
-import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -17,49 +16,46 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.util.NumberConversions;
 
-@Entity()
-@Table(name = "tickets")
-public class Ticket {
+@Entity @Getter @Setter @Table(name = "tickets")
+public final class Ticket {
     @Id
     private Integer id;
 
-    @NotEmpty
-    @Length(max = 16)
+    @Column(nullable = false, length = 16)
     private String ownerName;
 
-    @NotEmpty
+    @Column(nullable = false)
     private String serverName;
 
-    @NotEmpty
+    @Column(nullable = false)
     private String worldName;
 
-    @NotNull
+    @Column(nullable = false)
     private double x;
 
-    @NotNull
+    @Column(nullable = false)
     private double y;
 
-    @NotNull
+    @Column(nullable = false)
     private double z;
 
-    @NotNull
+    @Column(nullable = false)
     private float pitch;
 
-    @NotNull
+    @Column(nullable = false)
     private float yaw;
 
-    @NotNull
+    @Column(nullable = false)
     private String message;
 
     private String assigneeName;
 
-    @CreatedTimestamp
-    private Timestamp createTime;
+    private Date createTime;
 
-    @NotNull
+    @Column(nullable = false)
     private boolean open = true;
 
-    @NotNull
+    @Column(nullable = false)
     private boolean updated;
 
     public Ticket() {}
@@ -69,22 +65,7 @@ public class Ticket {
         setOwner(owner);
         setLocation(owner.getLocation());
         setMessage(message);
-    }
-
-    public Integer getId() {
-        return id;
-    }
-
-    public void setId(Integer id) {
-        this.id = id;
-    }
-
-    public String getOwnerName() {
-        return ownerName;
-    }
-
-    public void setOwnerName(String ownerName) {
-        this.ownerName = ownerName;
+        setCreateTime(new Date());
     }
 
     public void setOwner(Player player) {
@@ -97,62 +78,6 @@ public class Ticket {
 
     public boolean isOwner(CommandSender sender) {
         return sender.getName().equalsIgnoreCase(ownerName);
-    }
-
-    public String getServerName() {
-        return serverName;
-    }
-
-    public void setServerName(String serverName) {
-        this.serverName = serverName;
-    }
-
-    public String getWorldName() {
-        return worldName;
-    }
-
-    public void setWorldName(String worldName) {
-        this.worldName = worldName;
-    }
-
-    public double getX() {
-        return x;
-    }
-
-    public void setX(double x) {
-        this.x = x;
-    }
-
-    public double getY() {
-        return y;
-    }
-
-    public void setY(double y) {
-        this.y = y;
-    }
-
-    public double getZ() {
-        return z;
-    }
-
-    public void setZ(double z) {
-        this.z = z;
-    }
-
-    public float getPitch() {
-        return pitch;
-    }
-
-    public void setPitch(float pitch) {
-        this.pitch = pitch;
-    }
-
-    public float getYaw() {
-        return yaw;
-    }
-
-    public void setYaw(float yaw) {
-        this.yaw = yaw;
     }
 
     /**
@@ -173,22 +98,6 @@ public class Ticket {
         setYaw(location.getYaw());
     }
 
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public String getAssigneeName() {
-        return assigneeName;
-    }
-
-    public void setAssigneeName(String assigneeName) {
-        this.assigneeName = assigneeName;
-    }
-
     public void setAssignee(CommandSender sender) {
         this.assigneeName = sender.getName();
     }
@@ -199,30 +108,6 @@ public class Ticket {
 
     public boolean isAssigned(CommandSender sender) {
         return sender.getName().equalsIgnoreCase(assigneeName);
-    }
-
-    public Timestamp getCreateTime() {
-        return createTime;
-    }
-
-    public void setCreateTime(Timestamp createTime) {
-        this.createTime = createTime;
-    }
-
-    public boolean isOpen() {
-        return open;
-    }
-
-    public void setOpen(boolean open) {
-        this.open = open;
-    }
-
-    public boolean isUpdated() {
-        return updated;
-    }
-
-    public void setUpdated(boolean updated) {
-        this.updated = updated;
     }
 
     public void sendShortInfo(CommandSender sender, boolean verbose) {

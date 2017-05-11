@@ -1,80 +1,37 @@
 package com.winthier.ticket;
 
-import com.avaje.ebean.annotation.CreatedTimestamp;
-import com.avaje.ebean.validation.Length;
-import com.avaje.ebean.validation.NotEmpty;
-import com.avaje.ebean.validation.NotNull;
-import java.sql.Timestamp;
+import java.util.Date;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
 import org.bukkit.command.CommandSender;
 
-@Entity()
-@Table(name = "comments")
-public class Comment {
+@Entity @Getter @Setter @Table(name = "comments")
+public final class Comment {
     @Id
     private Integer id;
 
-    @NotNull
+    @Column(nullable = false)
     private Integer ticketId;
 
-    @Length(max = 16)
-    @NotEmpty
+    @Column(nullable = false, length = 16)
     private String commenterName;
 
-    @NotEmpty
+    @Column
     private String comment;
 
-    @CreatedTimestamp
-    private Timestamp createTime;
+    private Date createTime;
 
-    public Comment() {}
+    public Comment() { }
 
     public Comment(Integer ticketId, CommandSender commenter, String comment) {
         setTicketId(ticketId);
         setCommenterName(commenter.getName());
         setComment(comment);
-    }
-
-    public Integer getId() {
-        return id;
-    }
-
-    public void setId(Integer id) {
-        this.id = id;
-    }
-
-    public Integer getTicketId() {
-        return ticketId;
-    }
-
-    public void setTicketId(Integer ticketId) {
-        this.ticketId = ticketId;
-    }
-
-    public String getCommenterName() {
-        return commenterName;
-    }
-
-    public void setCommenterName(String commenterName) {
-        this.commenterName = commenterName;
-    }
-
-    public String getComment() {
-        return comment;
-    }
-
-    public void setComment(String comment) {
-        this.comment = comment;
-    }
-
-    public Timestamp getCreateTime() {
-        return createTime;
-    }
-
-    public void setCreateTime(Timestamp createTime) {
-        this.createTime = createTime;
+        setCreateTime(new Date());
     }
 
     public String getInfo() {

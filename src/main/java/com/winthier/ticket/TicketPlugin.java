@@ -1,6 +1,7 @@
 package com.winthier.ticket;
 
 import com.avaje.ebean.Expr;
+import com.winthier.sql.SQLDatabase;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -10,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.persistence.PersistenceException;
+import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -24,21 +26,20 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
+@Getter
 public class TicketPlugin extends JavaPlugin implements Listener {
     private ConfigurationSection usageMessages;
     private final ReminderTask reminderTask = new ReminderTask(this);
+    private SQLDatabase db;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         reloadConfig();
-        try {
-            getDatabase().find(Ticket.class).findRowCount();
-            getDatabase().find(Comment.class).findRowCount();
-        } catch (PersistenceException ex) {
-            System.out.println("Installing database for " + getDescription().getName() + " due to first time usage");
-            installDDL();
-        }
+        db = new SQLDatabase(this);
+        db.registerTable(Ticket.class);
+        db.registerTable(Comment.class);
+        db.createAllTables();
         Bukkit.getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
         getServer().getPluginManager().registerEvents(this, this);
         getCommand("ticket").setUsage(Util.format(getCommand("ticket").getUsage()));
@@ -106,7 +107,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     private Ticket ticketById(int id) {
-        List<Ticket> tickets = getDatabase().find(Ticket.class).where().idEq(id).findList();
+        List<Ticket> tickets = db.find(Ticket.class).where().eq("id", id).findList();
         if (tickets.isEmpty()) {
             throw new CommandException(String.format("Ticket [%d] not found.", id));
         }
@@ -158,7 +159,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     private void listOwnedTickets(CommandSender sender) {
-        List<Ticket> tickets = getDatabase().find(Ticket.class).where().ieq("ownerName", sender.getName()).findList();
+        List<Ticket> tickets = db.find(Ticket.class).where().eq("ownerName", sender.getName()).findList();
         List<Ticket> opens = new ArrayList<Ticket>();
         for (Ticket ticket : tickets) {
             if (ticket.isOpen() || ticket.isUpdated()) opens.add(ticket);
@@ -180,7 +181,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     private void listOpenTickets(CommandSender sender) {
-        List<Ticket> tickets = getDatabase().find(Ticket.class).where().eq("open", true).findList();
+        List<Ticket> tickets = db.find(Ticket.class).where().eq("open", true).findList();
         if (tickets.isEmpty()) {
             Util.sendMessage(sender, "&3No open tickets.");
         } else {
@@ -196,7 +197,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         if (args.length != 1) throw new UsageException("view");
         Ticket ticket = ticketById(args[0]);
         if (!ticket.isOwner(sender)) assertPermission(sender, "ticket.view.any");
-        List<Comment> comments = getDatabase().find(Comment.class).where().eq("ticketId", ticket.getId()).order().asc("id").findList();
+        List<Comment> comments = db.find(Comment.class).where().eq("ticketId", ticket.getId()).orderByAscending("id").findList();
         StringBuilder sb = new StringBuilder(ticket.getInfo());
         if (!comments.isEmpty()) {
             sb.append(Util.format("\n&3 Comments: &b%d", comments.size()));
@@ -207,7 +208,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         sender.sendMessage(sb.toString());
         if (ticket.isOwner(sender)) {
             ticket.setUpdated(false);
-            getDatabase().update(ticket, new HashSet<String>(Arrays.<String>asList("updated")));
+            db.save(ticket);
         }
         // Display options
         ticket.sendOptions(sender);
@@ -219,10 +220,10 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         Player player = (Player)sender;
         if (args.length == 0) throw new UsageException("new");
         assertCommand(args.length >= 3, "Write a message with at least 3 words.");
-        int ticketCount = getDatabase().find(Ticket.class).where().ieq("ownerName", player.getName()).eq("open", true).findRowCount();
+        int ticketCount = db.find(Ticket.class).where().eq("ownerName", player.getName()).eq("open", true).findRowCount();
         assertCommand(ticketCount < getMaxOpenTickets(), "You already have %d open tickets.", ticketCount);
         Ticket ticket = new Ticket(getServerName(), player, compileMessage(args, 0));
-        getDatabase().save(ticket);
+        db.save(ticket);
         if (sender instanceof Player) {
             int id = ticket.getId();
             Util.tellRaw((Player)sender, Arrays.asList(
@@ -240,16 +241,16 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         assertPermission(sender, "ticket.comment");
         if (args.length < 1) throw new UsageException("comment");
         Ticket ticket = ticketById(args[0]);
-        assertCommand(args.length >= 4, "Write a comment with at least 3 words.");
+        // assertCommand(args.length >= 4, "Write a comment with at least 3 words.");
         String message = compileMessage(args, 1);
         if (!ticket.isOwner(sender)) assertPermission(sender, "ticket.comment.any");
         Comment comment = new Comment(ticket.getId(), sender, message);
-        getDatabase().save(comment);
+        db.save(comment);
         Util.sendMessage(sender, "&bCommented on ticket &3[&b%d&3]&b: &7%s", ticket.getId(), comment.getComment());
         if (!ticket.isOwner(sender)) {
             if (!ticket.notifyOwner("&3%s commented on your ticket [&b%d&3]: &7%s", comment.getCommenterName(), ticket.getId(), comment.getComment())) {
                 ticket.setUpdated(true);
-                getDatabase().update(ticket, new HashSet<String>(Arrays.<String>asList("updated")));
+                db.save(ticket);
             }
         }
         notify(sender, "&e%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
@@ -270,7 +271,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
             message = "Closed";
         }
         Comment comment = new Comment(ticket.getId(), sender, message);
-        getDatabase().save(comment);
+        db.save(comment);
         ticket.setOpen(false);
         Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b closed: &7%s", ticket.getId(), cMessage);
         if (!ticket.isOwner(sender)) {
@@ -278,7 +279,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
                 ticket.setUpdated(true);
             }
         }
-        getDatabase().update(ticket, new HashSet<String>(Arrays.<String>asList("open", "updated")));
+        db.save(ticket);
         notify(sender, "&e%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
     }
 
@@ -297,7 +298,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
             message = "Reopened";
         }
         Comment comment = new Comment(ticket.getId(), sender, message);
-        getDatabase().save(comment);
+        db.save(comment);
         ticket.setOpen(true);
         Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b reopened: &7%s", ticket.getId(), cMessage);
         if (!ticket.isOwner(sender)) {
@@ -305,7 +306,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
                 ticket.setUpdated(true);
             }
         }
-        getDatabase().update(ticket, new HashSet<String>(Arrays.<String>asList("open", "updated")));
+        db.save(ticket);
         notify(sender, "&e%s reopened ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
     }
 
@@ -330,7 +331,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         // Assign
         if (!ticket.isAssigned()) {
             ticket.setAssignee(sender);
-            getDatabase().update(ticket, new HashSet<String>(Arrays.<String>asList("assigneeName")));
+            db.save(ticket);
             ticket.notifyOwner("&3%s was assigned to your ticket.", ticket.getAssigneeName());
             notify(sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
         }
@@ -341,7 +342,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         if (args.length < 2) throw new UsageException("assign");
         Ticket ticket = ticketById(args[0]);
         ticket.setAssigneeName(compileMessage(args, 1));
-        getDatabase().update(ticket, new HashSet<String>(Arrays.<String>asList("assigneeName")));
+        db.save(ticket);
         Util.sendMessage(sender, "&bAssigned %s to ticket &3[&b%d&3]&b.", ticket.getAssigneeName(), ticket.getId());
         notify(sender, "&e%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
     }
@@ -365,7 +366,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
 
     public void reminder() {
         // Remind moderators
-        int tickets = getDatabase().find(Ticket.class).where().eq("open", true).eq("assignee_name", null).findRowCount();
+        int tickets = db.find(Ticket.class).where().eq("open", true).isNull("assignee_name").findRowCount();
         if (tickets == 0) {
             // Do nothing.
         } else if (tickets > 1) {
@@ -375,7 +376,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
         }
         // Remind players
         Set<Player> players = new HashSet<Player>();
-        for (Ticket ticket : getDatabase().find(Ticket.class).where().eq("updated", true).findList()) {
+        for (Ticket ticket : db.find(Ticket.class).where().eq("updated", true).findList()) {
             Player player = ticket.getOwner();
             if (player != null) players.add(player);
         }
@@ -393,7 +394,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         if (player.hasPermission("ticket.moderation")) {
-            int tickets = getDatabase().find(Ticket.class).where().eq("open", true).eq("assignee_name", null).findRowCount();
+            int tickets = db.find(Ticket.class).where().eq("open", true).isNull("assignee_name").findRowCount();
             if (tickets == 0) {
                 return;
             } else if (tickets > 1) {
@@ -402,7 +403,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
                 Util.sendMessage(player, "&eThere is an open ticket. Please attend to it.");
             }
         }
-        int tickets = getDatabase().find(Ticket.class).where().ieq("ownerName", player.getName()).eq("updated", true).findRowCount();
+        int tickets = db.find(Ticket.class).where().eq("ownerName", player.getName()).eq("updated", true).findRowCount();
         if (tickets > 0) {
             // Util.tellraw(player, Util.format("['&3There are ticket updates for you. ',{text:'&3[&bClick here&3]',hoverEvent:{action:show_text,value:'&3Click here for more info'},clickEvent:{action:run_command,value:'/ticket'}},'&3 for more info.']"));
             Util.tellRaw(player, Arrays.asList(
