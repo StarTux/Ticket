@@ -1,11 +1,11 @@
 package com.winthier.ticket;
 
-import com.avaje.ebean.Expr;
 import com.winthier.playercache.PlayerCache;
 import com.winthier.sql.SQLDatabase;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -55,7 +55,7 @@ public class TicketPlugin extends JavaPlugin implements Listener {
 
     private String getUsageMessage(String key) {
         if (usageMessages == null) {
-            usageMessages = YamlConfiguration.loadConfiguration(getResource("usage.yml"));
+            usageMessages = YamlConfiguration.loadConfiguration(new InputStreamReader(getResource("usage.yml")));
         }
         return usageMessages.getString(key);
     }
@@ -478,14 +478,6 @@ public class TicketPlugin extends JavaPlugin implements Listener {
                              Util.format("&3 for more info.")
                              ));
         }
-    }
-
-    @Override
-    public List<Class<?>> getDatabaseClasses() {
-        List<Class<?>> list = new ArrayList<Class<?>>();
-        list.add(Ticket.class);
-        list.add(Comment.class);
-        return list;
     }
 
     public void notify(int id, CommandSender except, String message, Object... args) {
