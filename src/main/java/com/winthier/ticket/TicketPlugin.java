@@ -461,23 +461,24 @@ public class TicketPlugin extends JavaPlugin implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         if (player.hasPermission("ticket.moderation")) {
-            int tickets = db.find(Ticket.class).where().eq("open", true).isNull("assignee_name").findRowCount();
-            if (tickets == 0) {
-                return;
-            } else if (tickets > 1) {
-                Util.sendMessage(player, "&eThere are %d open tickets. Please attend to them.", tickets);
-            } else {
-                Util.sendMessage(player, "&eThere is an open ticket. Please attend to it.");
-            }
+            db.find(Ticket.class).where().eq("open", true).isNull("assignee_name").findRowCountAsync((tickets) -> {
+                    if (tickets == 0) {
+                        return;
+                    } else if (tickets > 1) {
+                        Util.sendMessage(player, "&eThere are %d open tickets. Please attend to them.", tickets);
+                    } else {
+                        Util.sendMessage(player, "&eThere is an open ticket. Please attend to it.");
+                    }
+                });
         }
-        int tickets = db.find(Ticket.class).where().eq("ownerUuid", player.getUniqueId()).eq("updated", true).findRowCount();
-        if (tickets > 0) {
-            Util.tellRaw(player, Arrays.asList(
-                             Util.format("&3There are ticket updates for you. "),
-                             Util.commandRunButton("&3[&bClick here&3]", "&3Click here for more info", "/ticket"),
-                             Util.format("&3 for more info.")
-                             ));
-        }
+        db.find(Ticket.class).where().eq("ownerUuid", player.getUniqueId()).eq("updated", true).findRowCountAsync((tickets) -> {
+                if (tickets <= 0) return;
+                Util.tellRaw(player, Arrays.asList(
+                                                   Util.format("&3There are ticket updates for you. "),
+                                                   Util.commandRunButton("&3[&bClick here&3]", "&3Click here for more info", "/ticket"),
+                                                   Util.format("&3 for more info.")
+                                                   ));
+            });
     }
 
     public void notify(int id, CommandSender except, String message, Object... args) {
