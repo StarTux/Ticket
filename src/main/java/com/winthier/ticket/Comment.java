@@ -32,9 +32,9 @@ public final class Comment {
 
     public Comment() { }
 
-    public Comment(Integer ticketId, CommandSender commenter, String comment) {
+    public Comment(final Integer ticketId, final CommandSender commenter, final String comment) {
         setTicketId(ticketId);
-        if (commenter instanceof Player) setCommenterUuid(((Player)commenter).getUniqueId());
+        if (commenter instanceof Player) setCommenterUuid(((Player) commenter).getUniqueId());
         setCommenterName(commenter.getName());
         setComment(comment);
         setCreateTime(new Date());

@@ -1,11 +1,9 @@
 package com.winthier.ticket;
 
 import java.text.DateFormatSymbols;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -13,7 +11,9 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.json.simple.JSONValue;
 
-public class Util {
+public final class Util {
+    private Util() { }
+
     public static String format(String msg, Object... args) {
         msg = ChatColor.translateAlternateColorCodes('&', msg);
         msg = String.format(msg, args);
@@ -37,7 +37,7 @@ public class Util {
     }
 
     public static String formatInterval(long interval) {
-        final int seconds = (int)(interval / 1000);
+        final int seconds = (int) (interval / 1000);
         final int minutes = seconds / 60;
         final int hours = minutes / 60;
         int days = hours / 24;

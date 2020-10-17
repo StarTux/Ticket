@@ -2,11 +2,11 @@ package com.winthier.ticket;
 
 import org.bukkit.scheduler.BukkitRunnable;
 
-public class ReminderTask {
+public final class ReminderTask {
     private final TicketPlugin plugin;
     private BukkitRunnable task;
 
-    public ReminderTask(TicketPlugin plugin) {
+    public ReminderTask(final TicketPlugin plugin) {
         this.plugin = plugin;
     }
 

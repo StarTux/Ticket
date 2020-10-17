@@ -1,9 +1,9 @@
 package com.winthier.ticket;
 
-public class UsageException extends RuntimeException {
+public final class UsageException extends RuntimeException {
     private final String key;
 
-    UsageException(String key) {
+    UsageException(final String key) {
         this.key = key;
     }
 
