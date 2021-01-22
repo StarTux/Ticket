@@ -1,5 +1,7 @@
 package com.winthier.ticket;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import java.text.DateFormatSymbols;
 import java.util.Calendar;
 import java.util.Date;
@@ -9,10 +11,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.json.simple.JSONValue;
 
 public final class Util {
     private Util() { }
+    static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     public static String format(String msg, Object... args) {
         msg = ChatColor.translateAlternateColorCodes('&', msg);
@@ -84,7 +86,7 @@ public final class Util {
     }
 
     public static void tellRaw(Player player, Object raw) {
-        String json = JSONValue.toJSONString(raw);
+        String json = GSON.toJson(raw);
         Bukkit.getServer().dispatchCommand(Bukkit.getServer().getConsoleSender(), "minecraft:tellraw " + player.getName() + " " + json);
     }
 }
