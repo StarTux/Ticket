@@ -84,6 +84,9 @@ public final class Ticket {
     }
 
     public boolean isOwner(CommandSender sender) {
+        if (ownerUuid != null && sender instanceof Player) {
+            return ownerUuid.equals(((Player) sender).getUniqueId());
+        }
         return sender.getName().equalsIgnoreCase(ownerName);
     }
 
