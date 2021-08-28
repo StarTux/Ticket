@@ -200,6 +200,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     private String compileMessage(String[] args, int beginIndex) {
+        if (args.length <= beginIndex) return "";
         StringBuilder sb = new StringBuilder(args[beginIndex]);
         for (int i = beginIndex + 1; i < args.length; ++i) {
             sb.append(" ").append(args[i]);
