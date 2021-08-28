@@ -2,6 +2,7 @@ package com.winthier.ticket;
 
 import com.winthier.playercache.PlayerCache;
 import com.winthier.sql.SQLDatabase;
+import com.winthier.ticket.event.TicketEvent;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -242,6 +243,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (args.length != 1) throw new UsageException("view");
         Ticket ticket = ticketById(args[0]);
         if (!ticket.isOwner(sender)) assertPermission(sender, "ticket.view.any");
+        if (!new TicketEvent(TicketEvent.Action.VIEW, ticket, sender).call()) {
+            return;
+        }
         List<Comment> comments = db.find(Comment.class).where().eq("ticketId", ticket.getId()).orderByAscending("id").findList();
         StringBuilder sb = new StringBuilder(ticket.getInfo());
         if (!comments.isEmpty()) {
@@ -268,7 +272,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         int ticketCount = db.find(Ticket.class).where().eq("ownerUuid", player.getUniqueId()).eq("open", true).findRowCount();
         assertCommand(ticketCount < getMaxOpenTickets(), "You already have %d open tickets.", ticketCount);
         Ticket ticket = new Ticket(getServerName(), player, compileMessage(args, 0));
+        if (!new TicketEvent(TicketEvent.Action.CREATE, ticket, sender).call()) {
+            return;
+        }
         db.save(ticket);
+        new TicketEvent(TicketEvent.Action.CREATED, ticket, sender).call();
         if (sender instanceof Player) {
             int id = ticket.getId();
             Util.tellRaw((Player) sender, Arrays
@@ -279,7 +287,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         } else {
             Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b created: &7%s", ticket.getId(), ticket.getMessage());
         }
-        notify(ticket.getId(), sender, "&e%s created ticket [%d]: %s", ticket.getOwnerName(), ticket.getId(), ticket.getMessage());
+        if (!ticket.isSilent()) {
+            notify(ticket.getId(), sender, "&e%s created ticket [%d]: %s", ticket.getOwnerName(), ticket.getId(), ticket.getMessage());
+        }
     }
 
     private void commentTicket(CommandSender sender, String[] args) {
@@ -290,6 +300,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         String message = compileMessage(args, 1);
         if (!ticket.isOwner(sender)) assertPermission(sender, "ticket.comment.any");
         Comment comment = new Comment(ticket.getId(), sender, message);
+        if (!new TicketEvent(TicketEvent.Action.COMMENT, ticket, sender, comment).call()) {
+            return;
+        }
         db.save(comment);
         Util.sendMessage(sender, "&bCommented on ticket &3[&b%d&3]&b: &7%s", ticket.getId(), comment.getComment());
         if (!ticket.isOwner(sender)) {
@@ -304,7 +317,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             ticket.setUpdated(true);
             db.save(ticket);
         }
-        notify(ticket.getId(), sender, "&e%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
+        if (!ticket.isSilent()) {
+            notify(ticket.getId(), sender, "&e%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
+        }
     }
 
     private void closeTicket(CommandSender sender, String[] args) {
@@ -323,6 +338,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             message = "Closed";
         }
         Comment comment = new Comment(ticket.getId(), sender, message);
+        if (!new TicketEvent(TicketEvent.Action.CLOSE, ticket, sender, comment).call()) {
+            return;
+        }
         db.save(comment);
         ticket.setOpen(false);
         Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b closed: &7%s", ticket.getId(), cMessage);
@@ -338,7 +356,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             ticket.setUpdated(true);
         }
         db.save(ticket);
-        notify(ticket.getId(), sender, "&e%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+        if (!ticket.isSilent()) {
+            notify(ticket.getId(), sender, "&e%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+        }
     }
 
     private void reopenTicket(CommandSender sender, String[] args) {
@@ -357,6 +377,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             message = "Reopened";
         }
         Comment comment = new Comment(ticket.getId(), sender, message);
+        if (!new TicketEvent(TicketEvent.Action.REOPEN, ticket, sender, comment).call()) {
+            return;
+        }
         db.save(comment);
         ticket.setOpen(true);
         Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b reopened: &7%s", ticket.getId(), cMessage);
@@ -372,7 +395,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             ticket.setUpdated(true);
         }
         db.save(ticket);
-        notify(comment.getTicketId(), sender, "&e%s reopened ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+        if (!ticket.isSilent()) {
+            notify(comment.getTicketId(), sender, "&e%s reopened ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+        }
     }
 
     private void portTicket(CommandSender sender, String[] args) {
@@ -382,6 +407,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (args.length != 1) throw new UsageException("port");
         Ticket ticket = ticketById(args[0]);
         // Try server.
+        if (!new TicketEvent(TicketEvent.Action.PORT, ticket, sender).call()) {
+            return;
+        }
         if (getPortServer() && !getServerName().equalsIgnoreCase(ticket.getServerName())) {
             Util.sendMessage(player, "&bTicket &3[&b%d&3]&b is on server %s...", ticket.getId(), ticket.getServerName());
             portServer(player, ticket.getServerName());
@@ -396,16 +424,20 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         // Assign
         if (!ticket.isAssigned()) {
             ticket.setAssignee(player);
-            db.save(ticket);
-            Player owner = ticket.getOwner();
-            if (owner != null) {
-                Util.tellRaw(owner,
-                             Util.commandRunButton("&3" + player.getName() + " was assigned to your ticket [&b" + ticket.getId() + "&3]",
-                                                   "&3Click to view this ticket",
-                                                   "/ticket view " + ticket.getId()));
+            if (new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).call()) {
+                db.save(ticket);
+                Player owner = ticket.getOwner();
+                if (owner != null) {
+                    Util.tellRaw(owner,
+                                 Util.commandRunButton("&3" + player.getName() + " was assigned to your ticket [&b" + ticket.getId() + "&3]",
+                                                       "&3Click to view this ticket",
+                                                       "/ticket view " + ticket.getId()));
+                }
+                ticket.setUpdated(true);
+                if (!ticket.isSilent()) {
+                    notify(ticket.getId(), sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
+                }
             }
-            ticket.setUpdated(true);
-            notify(ticket.getId(), sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
         }
     }
 
@@ -415,9 +447,14 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         Ticket ticket = ticketById(args[0]);
         ticket.setAssigneeUuid(PlayerCache.uuidForName(compileMessage(args, 1)));
         ticket.setAssigneeName(compileMessage(args, 1));
+        if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).call()) {
+            return;
+        }
         db.save(ticket);
         Util.sendMessage(sender, "&bAssigned %s to ticket &3[&b%d&3]&b.", ticket.getAssigneeName(), ticket.getId());
-        notify(ticket.getId(), sender, "&e%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
+        if (!ticket.isSilent()) {
+            notify(ticket.getId(), sender, "&e%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
+        }
     }
 
     private void reload(CommandSender sender, String[] args) {
@@ -439,7 +476,10 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
 
     public void reminder() {
         // Remind moderators
-        int tickets = db.find(Ticket.class).where().eq("open", true).isNull("assignee_name").findRowCount();
+        int tickets = db.find(Ticket.class).where()
+            .eq("open", true)
+            .eq("silent", false)
+            .isNull("assignee_name").findRowCount();
         if (tickets != 0) {
             if (tickets > 1) {
                 notify("&eThere are %d open tickets. Please attend to them.", tickets);

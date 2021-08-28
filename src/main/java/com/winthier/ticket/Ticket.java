@@ -63,6 +63,9 @@ public final class Ticket {
     @Column(nullable = false)
     private boolean updated;
 
+    @Column(nullable = false, columnDefinition = "INT(1) NOT NULL DEFAULT 1")
+    private boolean silent;
+
     public Ticket() { }
 
     public Ticket(final String serverName, final Player owner, final String message) {
