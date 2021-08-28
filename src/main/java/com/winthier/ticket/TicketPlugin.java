@@ -295,7 +295,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
 
     private void commentTicket(CommandSender sender, String[] args) {
         assertPermission(sender, "ticket.comment");
-        if (args.length < 1) throw new UsageException("comment");
+        if (args.length < 2) throw new UsageException("comment");
         Ticket ticket = ticketById(args[0]);
         // assertCommand(args.length >= 4, "Write a comment with at least 3 words.");
         String message = compileMessage(args, 1);
