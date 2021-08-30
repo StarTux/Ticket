@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -159,6 +160,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             Util.sendMessage(sender, "&c%s", ce.getMessage());
         }
         return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
+        return Collections.emptyList();
     }
 
     private Ticket ticketById(int id) {
@@ -580,7 +586,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         instance.db.find(Ticket.class).eq("id", id).deleteAsync(r -> {
                 instance.getLogger().info("Deleted ticket #" + id);
             });
-        instance.db.find(Command.class).eq("ticket_id", id).deleteAsync(r -> {
+        instance.db.find(Comment.class).eq("ticket_id", id).deleteAsync(r -> {
                 instance.getLogger().info("Deleted " + r + " comments of ticket #" + id);
             });
     }
