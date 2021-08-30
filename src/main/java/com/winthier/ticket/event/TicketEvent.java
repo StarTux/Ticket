@@ -53,7 +53,8 @@ public final class TicketEvent extends Event implements Cancellable {
         ASSIGN,
         CLOSE,
         REOPEN,
-        VIEW;
+        VIEW,
+        DELETE;
     }
 
     public boolean hasComment() {

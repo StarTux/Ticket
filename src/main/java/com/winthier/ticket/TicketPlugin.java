@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.Getter;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -33,9 +35,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     private ConfigurationSection usageMessages;
     private final ReminderTask reminderTask = new ReminderTask(this);
     private SQLDatabase db;
+    private static TicketPlugin instance;
 
     @Override
     public void onEnable() {
+        instance = this;
         saveDefaultConfig();
         reloadConfig();
         db = new SQLDatabase(this);
@@ -66,7 +70,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
 
     private void sendUsageMessage(CommandSender sender) {
         Util.sendMessage(sender, "&3Ticket usage:");
-        for (String key : Arrays.asList("new", "view", "comment", "close", "reopen", "port", "assign", "reload")) {
+        for (String key : Arrays.asList("new", "view", "comment", "close", "reopen", "port", "assign", "reload", "reminder", "delete")) {
             if (sender.hasPermission("ticket." + key)) Util.sendMessage(sender, " " + getUsageMessage(key));
         }
     }
@@ -81,25 +85,27 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                 if (sender instanceof Player) {
                     listOwnedTickets((Player) sender);
                 }
-            } else if ("New".equalsIgnoreCase(args[0])) {
+            } else if ("new".equals(args[0])) {
                 newTicket(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("View".equalsIgnoreCase(args[0])) {
+            } else if ("view".equals(args[0])) {
                 viewTicket(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("Comment".equalsIgnoreCase(args[0])) {
+            } else if ("comment".equals(args[0])) {
                 commentTicket(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("Close".equalsIgnoreCase(args[0])) {
+            } else if ("close".equals(args[0])) {
                 closeTicket(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("Reopen".equalsIgnoreCase(args[0])) {
+            } else if ("reopen".equals(args[0])) {
                 reopenTicket(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("Port".equalsIgnoreCase(args[0])) {
+            } else if ("port".equals(args[0])) {
                 portTicket(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("Assign".equalsIgnoreCase(args[0])) {
+            } else if ("assign".equals(args[0])) {
                 assignTicket(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("Reload".equalsIgnoreCase(args[0])) {
+            } else if ("reload".equals(args[0])) {
                 reload(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("Reminder".equalsIgnoreCase(args[0])) {
+            } else if ("reminder".equals(args[0])) {
                 reminder(sender, Arrays.<String>copyOfRange(args, 1, args.length));
-            } else if ("Migrate".equalsIgnoreCase(args[0]) && sender.isOp()) {
+            } else if ("delete".equals(args[0])) {
+                deleteTicket(sender, Arrays.<String>copyOfRange(args, 1, args.length));
+            } else if ("migrate".equals(args[0]) && sender.isOp()) {
                 int ticketsWithoutOwner = 0;
                 int ticketsWithFoundOwner = 0;
                 int ticketsWithoutAssignee = 0;
@@ -475,6 +481,17 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         reminderTask.restart();
     }
 
+    private void deleteTicket(CommandSender sender, String[] args) {
+        assertPermission(sender, "ticket.delete");
+        if (args.length != 1) throw new UsageException("delete");
+        Ticket ticket = ticketById(args[0]);
+        new TicketEvent(TicketEvent.Action.DELETE, ticket, sender).call();
+        int ticketCount = db.find(Ticket.class).eq("id", ticket.getId()).delete();
+        int commentCount = db.find(Comment.class).eq("ticket_id", ticket.getId()).delete();
+        sender.sendMessage(Component.text("Deleted ticket #" + ticket.getId() + ": " + ticketCount + " tickets, " + commentCount + " comments",
+                                          NamedTextColor.YELLOW));
+    }
+
     public void reminder() {
         // Remind moderators
         int tickets = db.find(Ticket.class).where()
@@ -557,5 +574,14 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
 
     public boolean getPortServer() {
         return getConfig().getBoolean("PortServer");
+    }
+
+    public static void deleteTicket(int id) {
+        instance.db.find(Ticket.class).eq("id", id).deleteAsync(r -> {
+                instance.getLogger().info("Deleted ticket #" + id);
+            });
+        instance.db.find(Command.class).eq("ticket_id", id).deleteAsync(r -> {
+                instance.getLogger().info("Deleted " + r + " comments of ticket #" + id);
+            });
     }
 }
