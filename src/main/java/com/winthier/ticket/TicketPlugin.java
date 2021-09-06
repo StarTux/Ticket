@@ -1,8 +1,10 @@
 package com.winthier.ticket;
 
+import com.winthier.connect.Connect;
 import com.winthier.playercache.PlayerCache;
 import com.winthier.sql.SQLDatabase;
 import com.winthier.ticket.event.TicketEvent;
+import com.winthier.ticket.sql.SQLWebhook;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -41,11 +43,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         instance = this;
-        saveDefaultConfig();
-        reloadConfig();
         db = new SQLDatabase(this);
-        db.registerTable(Ticket.class);
-        db.registerTable(Comment.class);
+        db.registerTables(Ticket.class, Comment.class, SQLWebhook.class);
         db.createAllTables();
         Bukkit.getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
         getServer().getPluginManager().registerEvents(this, this);
@@ -283,7 +282,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (args.length == 0) throw new UsageException("new");
         assertCommand(args.length >= 3, "Write a message with at least 3 words.");
         int ticketCount = db.find(Ticket.class).where().eq("ownerUuid", player.getUniqueId()).eq("open", true).findRowCount();
-        assertCommand(ticketCount < getMaxOpenTickets(), "You already have %d open tickets.", ticketCount);
+        assertCommand(ticketCount < 3, "You already have %d open tickets.", ticketCount);
         Ticket ticket = new Ticket(getServerName(), player, compileMessage(args, 0));
         if (!new TicketEvent(TicketEvent.Action.CREATE, ticket, sender).call()) {
             return;
@@ -302,6 +301,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s created ticket [%d]: %s", ticket.getOwnerName(), ticket.getId(), ticket.getMessage());
+            db.find(SQLWebhook.class).findListAsync(rows -> {
+                    for (SQLWebhook row : rows) {
+                        Webhook.send(this, row.getUrl(), ticket);
+                    }
+                });
         }
     }
 
@@ -332,6 +336,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
+            db.find(SQLWebhook.class).findListAsync(rows -> {
+                    for (SQLWebhook row : rows) {
+                        Webhook.send(this, row.getUrl(), ticket, "Comment", comment);
+                    }
+                });
         }
     }
 
@@ -371,6 +380,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         db.save(ticket);
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+            db.find(SQLWebhook.class).findListAsync(rows -> {
+                    for (SQLWebhook row : rows) {
+                        Webhook.send(this, row.getUrl(), ticket, "Closed", comment);
+                    }
+                });
         }
     }
 
@@ -410,6 +424,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         db.save(ticket);
         if (!ticket.isSilent()) {
             notify(comment.getTicketId(), sender, "&e%s reopened ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+            db.find(SQLWebhook.class).findListAsync(rows -> {
+                    for (SQLWebhook row : rows) {
+                        Webhook.send(this, row.getUrl(), ticket, "Reopen", comment);
+                    }
+                });
         }
     }
 
@@ -423,7 +442,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (!new TicketEvent(TicketEvent.Action.PORT, ticket, sender).call()) {
             return;
         }
-        if (getPortServer() && !getServerName().equalsIgnoreCase(ticket.getServerName())) {
+        if (!getServerName().equalsIgnoreCase(ticket.getServerName())) {
             Util.sendMessage(player, "&bTicket &3[&b%d&3]&b is on server %s...", ticket.getId(), ticket.getServerName());
             portServer(player, ticket.getServerName());
             return;
@@ -467,13 +486,17 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         Util.sendMessage(sender, "&bAssigned %s to ticket &3[&b%d&3]&b.", ticket.getAssigneeName(), ticket.getId());
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
+            db.find(SQLWebhook.class).findListAsync(rows -> {
+                    for (SQLWebhook row : rows) {
+                        Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
+                    }
+                });
         }
     }
 
     private void reload(CommandSender sender, String[] args) {
         assertPermission(sender, "ticket.reload");
         if (args.length > 0) throw new UsageException("reload");
-        reloadConfig();
         usageMessages = null;
         reminderTask.restart();
         Util.sendMessage(sender, "&bTicket configuration reloaded.");
@@ -571,15 +594,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     public String getServerName() {
-        return getConfig().getString("ServerName");
-    }
-
-    public int getMaxOpenTickets() {
-        return getConfig().getInt("MaxOpenTickets");
-    }
-
-    public boolean getPortServer() {
-        return getConfig().getBoolean("PortServer");
+        return Connect.getInstance().getServerName();
     }
 
     public static void deleteTicket(int id) {

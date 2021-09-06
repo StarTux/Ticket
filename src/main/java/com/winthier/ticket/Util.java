@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
 
 public final class Util {
     private Util() { }
-    static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
+    protected static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     public static String format(String msg, Object... args) {
         msg = ChatColor.translateAlternateColorCodes('&', msg);

@@ -11,7 +11,7 @@ public final class ReminderTask {
     }
 
     public void start() {
-        long delay = plugin.getConfig().getLong("ReminderInterval") * 20L * 60L;
+        long delay = 10L * 20L * 60L;
         if (delay < 0L) return;
         task = new BukkitRunnable() {
             public void run() {

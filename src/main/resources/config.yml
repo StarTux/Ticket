@@ -1,8 +1,0 @@
-# Name of this server
-ServerName: Minecraft
-# Open tickets per player
-MaxOpenTickets: 3
-# Use Bungee server porting.
-PortServer: false
-# Reminder task interval in minutes
-ReminderInterval: 10

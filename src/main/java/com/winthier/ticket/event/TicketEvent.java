@@ -2,7 +2,6 @@ package com.winthier.ticket.event;
 
 import com.winthier.ticket.Comment;
 import com.winthier.ticket.Ticket;
-import lombok.Data;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -13,7 +12,7 @@ import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
-@Data @RequiredArgsConstructor
+@Getter @RequiredArgsConstructor
 public final class TicketEvent extends Event implements Cancellable {
     private final Action action;
     private final Ticket ticket;
