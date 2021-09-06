@@ -93,6 +93,6 @@ public final class Webhook {
             .replace("`", "\\`")
             .replace("*", "\\*")
             .replace("_", "\\_")
-            .replace("/", "\\/');
+            .replace("/", "\\/");
     }
 }
