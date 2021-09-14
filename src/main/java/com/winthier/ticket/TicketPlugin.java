@@ -287,8 +287,10 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (!new TicketEvent(TicketEvent.Action.CREATE, ticket, sender).call()) {
             return;
         }
+        if (new TicketEvent(TicketEvent.Action.CREATED, ticket, sender).call()) {
+            return;
+        }
         db.save(ticket);
-        new TicketEvent(TicketEvent.Action.CREATED, ticket, sender).call();
         if (sender instanceof Player) {
             int id = ticket.getId();
             Util.tellRaw((Player) sender, Arrays
