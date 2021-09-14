@@ -1,6 +1,7 @@
 package com.winthier.ticket;
 
 import com.winthier.connect.Connect;
+import com.winthier.perm.Perm;
 import com.winthier.playercache.PlayerCache;
 import com.winthier.sql.SQLDatabase;
 import com.winthier.ticket.event.TicketEvent;
@@ -12,12 +13,15 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -36,7 +40,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 @Getter
 public final class TicketPlugin extends JavaPlugin implements Listener {
     private ConfigurationSection usageMessages;
-    private final ReminderTask reminderTask = new ReminderTask(this);
     private SQLDatabase db;
     private static TicketPlugin instance;
 
@@ -49,12 +52,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         Bukkit.getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
         getServer().getPluginManager().registerEvents(this, this);
         getCommand("ticket").setUsage(Util.format(getCommand("ticket").getUsage()));
-        reminderTask.start();
+        Bukkit.getScheduler().runTaskTimer(this, this::reminder, 0L, 20L * 60L * 5L);
     }
 
     @Override
     public void onDisable() {
-        reminderTask.stop();
     }
 
     private String getUsageMessage(String key) {
@@ -220,16 +222,20 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     private void listOwnedTickets(Player player) {
-        List<Ticket> tickets = db.find(Ticket.class).where().eq("ownerUuid", player.getUniqueId()).findList();
+        db.find(Ticket.class).where().eq("ownerUuid", player.getUniqueId()).findListAsync(tickets -> listOwnedTicketsCallback(player, tickets));
+    }
+
+    private void listOwnedTicketsCallback(Player player, List<Ticket> tickets) {
         List<Ticket> opens = new ArrayList<Ticket>();
         for (Ticket ticket : tickets) {
             if (ticket.isOpen() || ticket.isUpdated()) opens.add(ticket);
         }
         if (opens.isEmpty()) {
-            Util.tellRaw(player, Arrays.asList(
-                                               Util.format("&3Need staff assistance? Click here: "),
-                                               Util.commandSuggestButton("&3[&a\u270E &bNew Ticket&3]",
-                                                                         "&3Click here to make a new ticket.\n&3Leave a message in chat.", "/ticket new ")));
+            Util.tellRaw(player, Arrays.asList(new Object[] {
+                        Util.format("&3Need staff assistance? Click here: "),
+                        Util.commandSuggestButton("&3[&a\u270E &bNew Ticket&3]",
+                                                  "&3Click here to make a new ticket.\n&3Leave a message in chat.", "/ticket new "),
+                    }));
         } else {
             Util.sendMessage(player, "&3You have %d open ticket(s). Click below to view.", opens.size());
             for (Ticket ticket : opens) {
@@ -239,15 +245,40 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     private void listOpenTickets(CommandSender sender) {
-        List<Ticket> tickets = db.find(Ticket.class).where().eq("open", true).findList();
+        db.find(Ticket.class).where().eq("open", true).findListAsync(tickets -> listOpenTicketsCallback(sender, tickets));
+    }
+
+    private void listOpenTicketsCallback(CommandSender sender, List<Ticket> tickets) {
         if (tickets.isEmpty()) {
-            Util.sendMessage(sender, "&3No open tickets.");
-        } else {
-            Util.sendMessage(sender, "&3%d open ticket(s).", tickets.size());
-            for (Ticket ticket : tickets) {
-                ticket.sendShortInfo(sender, true);
-            }
+            sender.sendMessage(Component.text("No open ticket(s)", NamedTextColor.YELLOW));
+            return;
         }
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.text("" + tickets.size() + " open ticket(s)", NamedTextColor.YELLOW));
+        for (Ticket ticket : tickets) {
+            String cmd = "/ticket view " + ticket.getId();
+            NamedTextColor color = !ticket.isSilent() && (!ticket.isAssigned() || ticket.isAssigneeUpdate())
+                ? NamedTextColor.YELLOW
+                : NamedTextColor.GRAY;
+            NamedTextColor bgcolor = NamedTextColor.GRAY;
+            TextComponent.Builder msg = Component.text()
+                .clickEvent(ClickEvent.runCommand(cmd))
+                .hoverEvent(Component.text(cmd, color))
+                .color(color)
+                .append(Component.text("[", bgcolor))
+                .append(Component.text("\u21F2", NamedTextColor.GOLD))
+                .append(Component.text("" + ticket.getId()))
+                .append(Component.text("] ", bgcolor))
+                .append(Component.text(ticket.getOwnerName()));
+            if (ticket.isAssigned()) {
+                msg.append(Component.text(" \u2192 ", bgcolor)); // rightwards arrow
+                msg.append(Component.text(ticket.getAssigneeName()));
+            }
+            msg.append(Component.text(": ", bgcolor))
+                .append(Component.text(ticket.getShortMessage()));
+            lines.add(msg.build());
+        }
+        sender.sendMessage(Component.join(Component.newline(), lines));
     }
 
     private void viewTicket(CommandSender sender, String[] args) {
@@ -269,7 +300,10 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         sender.sendMessage(sb.toString());
         if (ticket.isOwner(sender)) {
             ticket.setUpdated(false);
-            db.save(ticket);
+            db.updateAsync(ticket, null, "updated");
+        } else if (!ticket.isAssigned() || ticket.isAssigned(sender)) {
+            ticket.setAssigneeUpdate(false);
+            db.updateAsync(ticket, null, "assignee_update");
         }
         // Display options
         ticket.sendOptions(sender);
@@ -287,10 +321,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (!new TicketEvent(TicketEvent.Action.CREATE, ticket, sender).call()) {
             return;
         }
-        if (new TicketEvent(TicketEvent.Action.CREATED, ticket, sender).call()) {
-            return;
-        }
-        db.save(ticket);
+        db.insertAsync(ticket, result -> newTicketCallback(sender, ticket, result));
+    }
+
+    private void newTicketCallback(CommandSender sender, Ticket ticket, int insertResult) {
+        new TicketEvent(TicketEvent.Action.CREATED, ticket, sender).call();
         if (sender instanceof Player) {
             int id = ticket.getId();
             Util.tellRaw((Player) sender, Arrays
@@ -322,9 +357,21 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (!new TicketEvent(TicketEvent.Action.COMMENT, ticket, sender, comment).call()) {
             return;
         }
-        db.save(comment);
+        db.insertAsync(comment, result -> commentTicketCallback(sender, ticket, comment, result));
+    }
+
+    /**
+     * After the comment was saved, we update the ticket itself
+     * accordingly.
+     */
+    private void commentTicketCallback(CommandSender sender, Ticket ticket, Comment comment, int insertResult) {
         Util.sendMessage(sender, "&bCommented on ticket &3[&b%d&3]&b: &7%s", ticket.getId(), comment.getComment());
-        if (!ticket.isOwner(sender)) {
+        if (ticket.isOwner(sender)) {
+            ticket.setAssigneeUpdate(true);
+            db.updateAsync(ticket, null, "assignee_update");
+        } else {
+            ticket.setUpdated(true);
+            db.updateAsync(ticket, null, "updated");
             Player owner = ticket.getOwner();
             if (owner != null) {
                 Util.tellRaw(owner,
@@ -333,11 +380,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                                                    "&3Click to view this ticket",
                                                    "/ticket view " + ticket.getId()));
             }
-            ticket.setUpdated(true);
-            db.save(ticket);
         }
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), sender, "&e%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
+            if (!ticket.isAssigned()) {
+                notify(ticket.getId(), sender, "&e%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
+            }
             db.find(SQLWebhook.class).findListAsync(rows -> {
                     for (SQLWebhook row : rows) {
                         Webhook.send(this, row.getUrl(), ticket, "Comment", comment);
@@ -365,10 +412,17 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (!new TicketEvent(TicketEvent.Action.CLOSE, ticket, sender, comment).call()) {
             return;
         }
-        db.save(comment);
+        db.insertAsync(comment, result -> closeTicketCallback(sender, ticket, comment, cMessage, result));
+    }
+
+    private void closeTicketCallback(CommandSender sender, Ticket ticket, Comment comment, String cMessage, int insertResult) {
         ticket.setOpen(false);
-        Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b closed: &7%s", ticket.getId(), cMessage);
-        if (!ticket.isOwner(sender)) {
+        if (ticket.isOwner(sender)) {
+            ticket.setAssigneeUpdate(true);
+            db.updateAsync(ticket, null, "open", "assignee_update");
+        } else {
+            ticket.setUpdated(true);
+            db.updateAsync(ticket, null, "open", "updated");
             Player owner = ticket.getOwner();
             if (owner != null) {
                 Util.tellRaw(owner,
@@ -377,9 +431,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                                                    "&3Click to view this ticket",
                                                    "/ticket view " + ticket.getId()));
             }
-            ticket.setUpdated(true);
         }
-        db.save(ticket);
+        Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b closed: &7%s", ticket.getId(), cMessage);
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
             db.find(SQLWebhook.class).findListAsync(rows -> {
@@ -409,11 +462,18 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (!new TicketEvent(TicketEvent.Action.REOPEN, ticket, sender, comment).call()) {
             return;
         }
-        db.save(comment);
+        db.insertAsync(comment, result -> reopenTicketCallback(sender, ticket, comment, cMessage, result));
+    }
+
+    private void reopenTicketCallback(CommandSender sender, Ticket ticket, Comment comment, String cMessage, int insertResult) {
         ticket.setOpen(true);
-        Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b reopened: &7%s", ticket.getId(), cMessage);
-        if (!ticket.isOwner(sender)) {
+        if (ticket.isOwner(sender)) {
+            ticket.setAssigneeUpdate(true);
+            db.updateAsync(ticket, null, "open", "assignee_update");
+        } else {
+            ticket.setUpdated(true);
             Player owner = ticket.getOwner();
+            db.updateAsync(ticket, null, "open", "updated");
             if (owner != null) {
                 Util.tellRaw(owner,
                              Util.commandRunButton("&3" + comment.getCommenterName() + " reopened your ticket [&b"
@@ -421,11 +481,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                                                    "&3Click to view this ticket",
                                                    "/ticket view " + ticket.getId()));
             }
-            ticket.setUpdated(true);
         }
-        db.save(ticket);
+        Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b reopened: &7%s", ticket.getId(), cMessage);
         if (!ticket.isSilent()) {
-            notify(comment.getTicketId(), sender, "&e%s reopened ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+            notify(comment.getTicketId(), sender, "&e%s reopened ticket [%d]: %s",
+                   comment.getCommenterName(), comment.getTicketId(), cMessage);
             db.find(SQLWebhook.class).findListAsync(rows -> {
                     for (SQLWebhook row : rows) {
                         Webhook.send(this, row.getUrl(), ticket, "Reopen", comment);
@@ -456,36 +516,50 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         Util.sendMessage(player, "&bPorted to ticket &3[&b%d&3]&b.", ticket.getId());
         //Util.sendMessage(player, ticket.getInfo());
         // Assign
-        if (!ticket.isAssigned()) {
-            ticket.setAssignee(player);
-            if (new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).call()) {
-                db.save(ticket);
-                Player owner = ticket.getOwner();
-                if (owner != null) {
-                    Util.tellRaw(owner,
-                                 Util.commandRunButton("&3" + player.getName() + " was assigned to your ticket [&b" + ticket.getId() + "&3]",
-                                                       "&3Click to view this ticket",
-                                                       "/ticket view " + ticket.getId()));
-                }
-                ticket.setUpdated(true);
-                if (!ticket.isSilent()) {
-                    notify(ticket.getId(), sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
-                }
-            }
+        if (ticket.isAssigned()) return;
+        ticket.setAssignee(player);
+        ticket.setUpdated(true);
+        ticket.setAssigneeUpdate(false);
+        if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).call()) return;
+        db.updateAsync(ticket, null, "assignee_name", "assignee_uuid", "updated", "assignee_update");
+        Player owner = ticket.getOwner();
+        if (owner != null) {
+            Util.tellRaw(owner,
+                         Util.commandRunButton("&3" + player.getName() + " was assigned to your ticket [&b" + ticket.getId() + "&3]",
+                                               "&3Click to view this ticket",
+                                               "/ticket view " + ticket.getId()));
+        }
+        if (!ticket.isSilent()) {
+            notify(ticket.getId(), sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
         }
     }
 
     private void assignTicket(CommandSender sender, String[] args) {
         assertPermission(sender, "ticket.assign");
-        if (args.length < 2) throw new UsageException("assign");
+        if (args.length != 2) throw new UsageException("assign");
         Ticket ticket = ticketById(args[0]);
-        ticket.setAssigneeUuid(PlayerCache.uuidForName(compileMessage(args, 1)));
-        ticket.setAssigneeName(compileMessage(args, 1));
+        PlayerCache playerCache = PlayerCache.forArg(args[1]);
+        if (playerCache == null) {
+            sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
+            return;
+        }
+        if (!Perm.has(playerCache.uuid, "ticket.moderation")) {
+            sender.sendMessage(Component.text("Player not a ticket moderator: " + playerCache.name, NamedTextColor.RED));
+            return;
+        }
+        ticket.setAssignee(playerCache);
         if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).call()) {
             return;
         }
-        db.save(ticket);
+        db.updateAsync(ticket, null, "assignee_uuid", "assignee_name");
         Util.sendMessage(sender, "&bAssigned %s to ticket &3[&b%d&3]&b.", ticket.getAssigneeName(), ticket.getId());
+        Player owner = ticket.getOwner();
+        if (owner != null) {
+            Util.tellRaw(owner,
+                         Util.commandRunButton("&3" + ticket.getAssigneeName() + " was assigned to your ticket [&b" + ticket.getId() + "&3]",
+                                               "&3Click to view this ticket",
+                                               "/ticket view " + ticket.getId()));
+        }
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
             db.find(SQLWebhook.class).findListAsync(rows -> {
@@ -500,7 +574,6 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         assertPermission(sender, "ticket.reload");
         if (args.length > 0) throw new UsageException("reload");
         usageMessages = null;
-        reminderTask.restart();
         Util.sendMessage(sender, "&bTicket configuration reloaded.");
     }
 
@@ -509,7 +582,6 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (args.length > 0) throw new UsageException("reminder");
         Util.sendMessage(sender, "&bTriggering reminder...");
         reminder();
-        reminderTask.restart();
     }
 
     private void deleteTicket(CommandSender sender, String[] args) {
@@ -524,30 +596,60 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     public void reminder() {
-        // Remind moderators
-        int tickets = db.find(Ticket.class).where()
+        db.find(Ticket.class)
             .eq("open", true)
-            .eq("silent", false)
-            .isNull("assignee_name").findRowCount();
-        if (tickets != 0) {
-            if (tickets > 1) {
-                notify("&eThere are %d open tickets. Please attend to them.", tickets);
+            .findListAsync(this::reminderCallback);
+    }
+
+    private void reminderCallback(List<Ticket> tickets) {
+        if (tickets.size() == 0) return;
+        int unassigned = 0;
+        Map<UUID, Ticket> adminUpdates = new HashMap<>();
+        Map<UUID, Ticket> ownerUpdates = new HashMap<>();
+        for (Ticket ticket : tickets) {
+            if (ticket.getAssigneeUuid() != null) {
+                if (ticket.isAssigneeUpdate()) {
+                    adminUpdates.put(ticket.getAssigneeUuid(), ticket);
+                }
             } else {
-                notify("&eThere is an open ticket. Please attend to it.");
+                unassigned += 1;
+            }
+            if (ticket.isUpdated() && ticket.getOwnerUuid() != null) {
+                ownerUpdates.put(ticket.getOwnerUuid(), ticket);
             }
         }
-        // Remind players
-        Set<Player> players = new HashSet<Player>();
-        for (Ticket ticket : db.find(Ticket.class).where().eq("updated", true).findList()) {
-            Player player = ticket.getOwner();
-            if (player != null) players.add(player);
+        if (unassigned > 0) {
+            if (unassigned > 1) {
+                notify("&eThere are %d unassigned tickets. Please attend to them.", tickets);
+            } else {
+                notify("&eThere is an unassigned ticket. Please attend to it.");
+            }
         }
-        for (Player player : players) {
-            Util.tellRaw(player, Arrays.asList(
-                                               Util.format("&3There are ticket updates for you. "),
-                                               Util.commandRunButton("&3[&bClick here&3]", "&3Click here for more info", "/ticket"),
-                                               Util.format("&3 for more info.")
-                                               ));
+        for (Map.Entry<UUID, Ticket> entry : adminUpdates.entrySet()) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null) continue;
+            Ticket ticket = entry.getValue();
+            String cmd = "/ticket view " + ticket.getId();
+            player.sendMessage(Component.text()
+                               .content("Ticket [")
+                               .color(NamedTextColor.YELLOW)
+                               .append(Component.text("" + ticket.getId(), NamedTextColor.GOLD))
+                               .append(Component.text("] by " + ticket.getOwnerName() + " has an update! Click for more info."))
+                               .hoverEvent(HoverEvent.showText(Component.text(cmd, NamedTextColor.YELLOW)))
+                               .clickEvent(ClickEvent.runCommand(cmd)));
+        }
+        for (Map.Entry<UUID, Ticket> entry : ownerUpdates.entrySet()) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null) continue;
+            Ticket ticket = entry.getValue();
+            String cmd = "/ticket view " + ticket.getId();
+            player.sendMessage(Component.text()
+                               .content("Ticket [")
+                               .color(NamedTextColor.DARK_AQUA)
+                               .append(Component.text("" + ticket.getId(), NamedTextColor.AQUA))
+                               .append(Component.text("] has an update for you! Click here for more info."))
+                               .hoverEvent(HoverEvent.showText(Component.text(cmd, NamedTextColor.YELLOW)))
+                               .clickEvent(ClickEvent.runCommand(cmd)));
         }
     }
 

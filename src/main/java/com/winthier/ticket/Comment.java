@@ -6,13 +6,18 @@ import java.util.UUID;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import javax.persistence.Index;
 import javax.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-@Entity @Getter @Setter @Table(name = "comments")
+@Entity @Getter @Setter
+@Table(name = "comments",
+       indexes = {
+           @Index(name = "idx_ticket", columnList = "ticket_id"),
+       })
 public final class Comment {
     @Id
     private Integer id;

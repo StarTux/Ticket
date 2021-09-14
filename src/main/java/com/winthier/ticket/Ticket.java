@@ -8,6 +8,7 @@ import java.util.UUID;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import javax.persistence.Index;
 import javax.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,7 +19,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.util.NumberConversions;
 
-@Entity @Getter @Setter @Table(name = "tickets")
+@Entity @Getter @Setter
+@Table(name = "tickets",
+       indexes = {
+           @Index(name = "idx_owner", columnList = "owner_uuid"),
+           @Index(name = "idx_assignee", columnList = "assignee_uuid"),
+           @Index(name = "idx_open", columnList = "open"),
+       })
 public final class Ticket {
     @Id
     private Integer id;
@@ -55,6 +62,9 @@ public final class Ticket {
     private UUID assigneeUuid;
     private String assigneeName;
 
+    @Column(nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
+    private boolean assigneeUpdate;
+
     private Date createTime;
 
     @Column(nullable = false)
@@ -63,17 +73,18 @@ public final class Ticket {
     @Column(nullable = false)
     private boolean updated;
 
-    @Column(nullable = false, columnDefinition = "INT(1) NOT NULL DEFAULT 1")
+    @Column(nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean silent;
 
     public Ticket() { }
 
     public Ticket(final String serverName, final Player owner, final String message) {
-        setServerName(serverName);
+        this.serverName = serverName;
         setOwner(owner);
         setLocation(owner.getLocation());
-        setMessage(message);
-        setCreateTime(new Date());
+        this.message = message;
+        this.createTime = new Date();
+        this.assigneeUpdate = true;
     }
 
     public void setOwner(Player player) {
@@ -82,8 +93,7 @@ public final class Ticket {
     }
 
     public Player getOwner() {
-        if (ownerUuid != null) return Bukkit.getServer().getPlayer(ownerUuid);
-        return Bukkit.getServer().getPlayerExact(ownerName);
+        return ownerUuid != null ? Bukkit.getServer().getPlayer(ownerUuid) : null;
     }
 
     public boolean isOwner(CommandSender sender) {
@@ -109,6 +119,10 @@ public final class Ticket {
         return assigneeName;
     }
 
+    public Player getAssignee() {
+        return assigneeUuid != null ? Bukkit.getServer().getPlayer(assigneeUuid) : null;
+    }
+
     /**
      * @return the location or null if world not found
      */
@@ -132,13 +146,21 @@ public final class Ticket {
         setAssigneeName(player.getName());
     }
 
+    public void setAssignee(PlayerCache playerCache) {
+        setAssigneeUuid(playerCache.uuid);
+        setAssigneeName(playerCache.name);
+    }
+
     public boolean isAssigned() {
         return assigneeName != null;
     }
 
     public boolean isAssigned(Player player) {
-        if (assigneeUuid != null) return player.getUniqueId().equals(assigneeUuid);
-        return player.getName().equalsIgnoreCase(assigneeName);
+        return player.getUniqueId().equals(assigneeUuid);
+    }
+
+    public boolean isAssigned(CommandSender sender) {
+        return sender instanceof Player && ((Player) sender).getUniqueId().equals(assigneeUuid);
     }
 
     public void sendShortInfo(CommandSender sender, boolean verbose) {
@@ -170,6 +192,13 @@ public final class Ticket {
                 Util.sendMessage(sender, "&3[&b%d&3] (&b%s&3) &b%s&3 => &b%s&3:&7 %s", id, serverName, ownerName, assigneeName, infoMessage);
             }
         }
+    }
+
+    public String getShortMessage() {
+        final int max = 18;
+        return message.length() > max
+            ? message.substring(0, max - 2) + "..."
+            : message;
     }
 
     public void sendOptions(CommandSender sender) {
