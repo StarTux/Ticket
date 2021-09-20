@@ -548,10 +548,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             return;
         }
         ticket.setAssignee(playerCache);
+        ticket.setAssigneeUpdate(!ticket.isAssigned(sender));
         if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).call()) {
             return;
         }
-        db.updateAsync(ticket, null, "assignee_uuid", "assignee_name");
+        db.updateAsync(ticket, null, "assignee_uuid", "assignee_name", "assignee_update");
         Util.sendMessage(sender, "&bAssigned %s to ticket &3[&b%d&3]&b.", ticket.getAssigneeName(), ticket.getId());
         Player owner = ticket.getOwner();
         if (owner != null) {
