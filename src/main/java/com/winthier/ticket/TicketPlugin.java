@@ -531,6 +531,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
+            db.find(SQLWebhook.class).findListAsync(rows -> {
+                    for (SQLWebhook row : rows) {
+                        Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
+                    }
+                });
         }
     }
 
