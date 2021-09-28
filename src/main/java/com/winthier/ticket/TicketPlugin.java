@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -278,7 +279,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                 .append(Component.text(ticket.getShortMessage()));
             lines.add(msg.build());
         }
-        sender.sendMessage(Component.join(Component.newline(), lines));
+        sender.sendMessage(Component.join(JoinConfiguration.separator(Component.newline()), lines));
     }
 
     private void viewTicket(CommandSender sender, String[] args) {
@@ -338,8 +339,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s created ticket [%d]: %s", ticket.getOwnerName(), ticket.getId(), ticket.getMessage());
-            db.find(SQLWebhook.class).findListAsync(rows -> {
-                    for (SQLWebhook row : rows) {
+            db.scheduleAsyncTask(() -> {
+                    for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket);
                     }
                 });
@@ -385,8 +386,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             if (!ticket.isAssigned()) {
                 notify(ticket.getId(), sender, "&e%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
             }
-            db.find(SQLWebhook.class).findListAsync(rows -> {
-                    for (SQLWebhook row : rows) {
+            db.scheduleAsyncTask(() -> {
+                    for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Comment", comment);
                     }
                 });
@@ -435,8 +436,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b closed: &7%s", ticket.getId(), cMessage);
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
-            db.find(SQLWebhook.class).findListAsync(rows -> {
-                    for (SQLWebhook row : rows) {
+            db.scheduleAsyncTask(() -> {
+                    for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Closed", comment);
                     }
                 });
@@ -486,8 +487,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (!ticket.isSilent()) {
             notify(comment.getTicketId(), sender, "&e%s reopened ticket [%d]: %s",
                    comment.getCommenterName(), comment.getTicketId(), cMessage);
-            db.find(SQLWebhook.class).findListAsync(rows -> {
-                    for (SQLWebhook row : rows) {
+            db.scheduleAsyncTask(() -> {
+                    for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Reopen", comment);
                     }
                 });
@@ -531,8 +532,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
-            db.find(SQLWebhook.class).findListAsync(rows -> {
-                    for (SQLWebhook row : rows) {
+            db.scheduleAsyncTask(() -> {
+                    for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
                     }
                 });
@@ -568,8 +569,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (!ticket.isSilent()) {
             notify(ticket.getId(), sender, "&e%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
-            db.find(SQLWebhook.class).findListAsync(rows -> {
-                    for (SQLWebhook row : rows) {
+            db.scheduleAsyncTask(() -> {
+                    for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
                     }
                 });
