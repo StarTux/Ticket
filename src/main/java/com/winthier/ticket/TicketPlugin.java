@@ -614,6 +614,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         Map<UUID, Ticket> adminUpdates = new HashMap<>();
         Map<UUID, Ticket> ownerUpdates = new HashMap<>();
         for (Ticket ticket : tickets) {
+            if (ticket.isSilent()) continue;
             if (ticket.getAssigneeUuid() != null) {
                 if (ticket.isAssigneeUpdate()) {
                     adminUpdates.put(ticket.getAssigneeUuid(), ticket);
