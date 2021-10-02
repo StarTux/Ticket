@@ -299,7 +299,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             }
         }
         sender.sendMessage(sb.toString());
-        if (ticket.isOwner(sender)) {
+        if (ticket.isOwner(sender) && ticket.isUpdated()) {
             ticket.setUpdated(false);
             db.updateAsync(ticket, null, "updated");
         } else if (!ticket.isAssigned() || ticket.isAssigned(sender)) {
