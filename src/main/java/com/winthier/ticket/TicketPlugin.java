@@ -628,7 +628,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (unassigned > 0) {
             if (unassigned > 1) {
-                notify("&eThere are %d unassigned tickets. Please attend to them.", tickets);
+                notify("&eThere are %d unassigned tickets. Please attend to them.", unassigned);
             } else {
                 notify("&eThere is an unassigned ticket. Please attend to it.");
             }
