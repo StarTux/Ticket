@@ -22,6 +22,10 @@ public final class Util {
         return msg;
     }
 
+    public static String colorize(String msg) {
+        return ChatColor.translateAlternateColorCodes('&', msg);
+    }
+
     public static void sendMessage(CommandSender sender, String msg, Object... args) {
         sender.sendMessage(format(msg, args));
     }
@@ -61,9 +65,8 @@ public final class Util {
     }
 
     public static Object commandButton(String label, String tooltip, String command, boolean run) {
-        label = format(label);
-        tooltip = format(tooltip);
-        command = format(command);
+        label = colorize(label);
+        tooltip = colorize(tooltip);
         Map<String, Object> result = new HashMap<>();
         result.put("text", label);
         Map<String, String> tooltipMap = new HashMap<>();
