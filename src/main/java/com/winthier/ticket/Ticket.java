@@ -1,6 +1,7 @@
 package com.winthier.ticket;
 
 import com.winthier.playercache.PlayerCache;
+import com.winthier.sql.SQLRow;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -26,7 +27,7 @@ import org.bukkit.util.NumberConversions;
            @Index(name = "idx_assignee", columnList = "assignee_uuid"),
            @Index(name = "idx_open", columnList = "open"),
        })
-public final class Ticket {
+public final class Ticket implements SQLRow {
     @Id
     private Integer id;
 

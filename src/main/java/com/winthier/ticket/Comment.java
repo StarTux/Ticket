@@ -1,6 +1,7 @@
 package com.winthier.ticket;
 
 import com.winthier.playercache.PlayerCache;
+import com.winthier.sql.SQLRow;
 import java.util.Date;
 import java.util.UUID;
 import javax.persistence.Column;
@@ -18,7 +19,7 @@ import org.bukkit.entity.Player;
        indexes = {
            @Index(name = "idx_ticket", columnList = "ticket_id"),
        })
-public final class Comment {
+public final class Comment implements SQLRow {
     @Id
     private Integer id;
 
