@@ -1,14 +1,12 @@
 package com.winthier.ticket;
 
-import com.winthier.connect.Connect;
-import com.winthier.perm.Perm;
-import com.winthier.playercache.PlayerCache;
+import com.cavetale.core.bungee.Bungee;
+import com.cavetale.core.connect.Connect;
+import com.cavetale.core.perm.Perm;
+import com.cavetale.core.playercache.PlayerCache;
 import com.winthier.sql.SQLDatabase;
 import com.winthier.ticket.event.TicketEvent;
 import com.winthier.ticket.sql.SQLWebhook;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,9 +46,10 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     public void onEnable() {
         instance = this;
         db = new SQLDatabase(this);
-        db.registerTables(Ticket.class, Comment.class, SQLWebhook.class);
+        db.registerTables(List.of(Ticket.class,
+                                  Comment.class,
+                                  SQLWebhook.class));
         db.createAllTables();
-        Bukkit.getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
         getServer().getPluginManager().registerEvents(this, this);
         getCommand("ticket").setUsage(Util.format(getCommand("ticket").getUsage()));
         Bukkit.getScheduler().runTaskTimer(this, this::reminder, 0L, 20L * 60L * 5L);
@@ -199,18 +198,6 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
 
     private void assertPlayer(CommandSender sender) {
         assertCommand(sender instanceof Player, "Player expected.");
-    }
-
-    private void portServer(Player player, String serverName) {
-        ByteArrayOutputStream b = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(b);
-        try {
-            out.writeUTF("Connect");
-            out.writeUTF(serverName);
-        } catch (IOException ex) {
-            // Impossible
-        }
-        player.sendPluginMessage(this, "BungeeCord", b.toByteArray());
     }
 
     private String compileMessage(String[] args, int beginIndex) {
@@ -507,7 +494,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (!getServerName().equalsIgnoreCase(ticket.getServerName())) {
             Util.sendMessage(player, "&bTicket &3[&b%d&3]&b is on server %s...", ticket.getId(), ticket.getServerName());
-            portServer(player, ticket.getServerName());
+            Bungee.send(player, ticket.getServerName());
             return;
         }
         // Try location.
@@ -549,7 +536,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
             return;
         }
-        if (!Perm.has(playerCache.uuid, "ticket.moderation")) {
+        if (!Perm.get().has(playerCache.uuid, "ticket.moderation")) {
             sender.sendMessage(Component.text("Player not a ticket moderator: " + playerCache.name, NamedTextColor.RED));
             return;
         }
@@ -706,7 +693,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     public String getServerName() {
-        return Connect.getInstance().getServerName();
+        return Connect.get().getServerName();
     }
 
     public static void deleteTicket(int id) {

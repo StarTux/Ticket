@@ -2,13 +2,13 @@ main: com.winthier.ticket.TicketPlugin
 name: Ticket
 
 version: 0.1
-api-version: 1.18
+api-version: 1.19
 
 description: Ticket system
 author: StarTux
 website: https://cavetale.com
 
-depend: [SQL, PlayerCache, Connect, Perm]
+depend: [Core, SQL]
 softdepend: []
 
 commands:
