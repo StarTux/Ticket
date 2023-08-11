@@ -20,7 +20,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandException;
@@ -329,7 +328,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b created: &7%s", ticket.getId(), ticket.getMessage());
         }
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), sender, "&e%s created ticket [%d]: %s", ticket.getOwnerName(), ticket.getId(), ticket.getMessage());
+            notify(ticket.getId(), "%s created ticket [%d]: %s", ticket.getOwnerName(), ticket.getId(), ticket.getMessage());
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket);
@@ -375,7 +374,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         if (!ticket.isSilent()) {
             if (!ticket.isAssigned()) {
-                notify(ticket.getId(), sender, "&e%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
+                notify(ticket.getId(), "%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
             }
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
@@ -426,7 +425,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b closed: &7%s", ticket.getId(), cMessage);
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), sender, "&e%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+            notify(ticket.getId(), "%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Closed", comment);
@@ -476,7 +475,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b reopened: &7%s", ticket.getId(), cMessage);
         if (!ticket.isSilent()) {
-            notify(comment.getTicketId(), sender, "&e%s reopened ticket [%d]: %s",
+            notify(comment.getTicketId(), "%s reopened ticket [%d]: %s",
                    comment.getCommenterName(), comment.getTicketId(), cMessage);
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
@@ -528,7 +527,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                                                "/ticket view " + ticket.getId()));
         }
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), player, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
+            notify(ticket.getId(), "%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
@@ -565,7 +564,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                                                "/ticket view " + ticket.getId()));
         }
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), sender, "&e%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
+            notify(ticket.getId(), "%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
@@ -623,12 +622,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                 ownerUpdates.put(ticket.getOwnerUuid(), ticket);
             }
         }
-        if (unassigned > 0) {
-            if (unassigned > 1) {
-                notify("&eThere are %d unassigned tickets. Please attend to them.", unassigned);
-            } else {
-                notify("&eThere is an unassigned ticket. Please attend to it.");
-            }
+        if (unassigned > 1) {
+            notify("There are " + unassigned + " unassigned tickets. Please attend to them.");
+        } else if (unassigned == 1) {
+            final int id = tickets.get(0).getId();
+            notify(id, "There is an unassigned ticket. Please attend to it.");
         }
         for (Map.Entry<UUID, Ticket> entry : adminUpdates.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
@@ -682,23 +680,38 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             });
     }
 
-    public void notify(int id, CommandSender except, String message, Object... args) {
-        message = Util.format(message, args);
-        getLogger().info(ChatColor.stripColor(message));
-        for (Player player : getServer().getOnlinePlayers()) {
-            if (!player.equals(except) && player.hasPermission("ticket.notify")) {
-                Util.tellRaw(player, Util.commandRunButton(message, "&3Click here for more info", "/ticket view " + id));
-            }
-        }
+    /**
+     * Notify all permission holders with the clickable message which
+     * views the ticket.
+     */
+    public void notify(int id, String message, Object... args) {
+        message = String.format(message, args);
+        getLogger().info("[" + id + "] " + message);
+        final String cmd = "/ticket view " + id;
+        notify(text(message, YELLOW)
+               .hoverEvent(showText(text(cmd, YELLOW)))
+               .clickEvent(runCommand(cmd))
+               .insertion(cmd));
     }
 
+    /**
+     * Notify all permission holders with the clickable message which
+     * lists all tickets.
+     */
     public void notify(String message, Object... args) {
-        message = Util.format(message, args);
-        getLogger().info(ChatColor.stripColor(message));
+        message = String.format(message, args);
+        getLogger().info(message);
+        final String cmd = "/ticket";
+        notify(text(message, YELLOW)
+               .hoverEvent(showText(text(cmd, YELLOW)))
+               .clickEvent(runCommand(cmd))
+               .insertion(cmd));
+    }
+
+    public void notify(Component message) {
         for (Player player : getServer().getOnlinePlayers()) {
-            if (player.hasPermission("ticket.notify")) {
-                Util.tellRaw(player, Util.commandRunButton(message, "&3Click here for more info", "/ticket"));
-            }
+            if (!player.hasPermission("ticket.notify")) continue;
+            player.sendMessage(message);
         }
     }
 
