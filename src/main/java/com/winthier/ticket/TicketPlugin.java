@@ -17,10 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -35,6 +32,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import static net.kyori.adventure.text.Component.join;
+import static net.kyori.adventure.text.Component.newline;
+import static net.kyori.adventure.text.Component.text;
+import static net.kyori.adventure.text.JoinConfiguration.separator;
+import static net.kyori.adventure.text.event.ClickEvent.runCommand;
+import static net.kyori.adventure.text.event.HoverEvent.showText;
+import static net.kyori.adventure.text.format.NamedTextColor.*;
 
 @Getter
 public final class TicketPlugin extends JavaPlugin implements Listener {
@@ -238,35 +242,35 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
 
     private void listOpenTicketsCallback(CommandSender sender, List<Ticket> tickets) {
         if (tickets.isEmpty()) {
-            sender.sendMessage(Component.text("No open ticket(s)", NamedTextColor.YELLOW));
+            sender.sendMessage(text("No open ticket(s)", YELLOW));
             return;
         }
         List<Component> lines = new ArrayList<>();
-        lines.add(Component.text("" + tickets.size() + " open ticket(s)", NamedTextColor.YELLOW));
+        lines.add(text("" + tickets.size() + " open ticket(s)", YELLOW));
         for (Ticket ticket : tickets) {
             String cmd = "/ticket view " + ticket.getId();
             NamedTextColor color = !ticket.isSilent() && (!ticket.isAssigned() || ticket.isAssigneeUpdate())
-                ? NamedTextColor.YELLOW
-                : NamedTextColor.GRAY;
-            NamedTextColor bgcolor = NamedTextColor.GRAY;
-            TextComponent.Builder msg = Component.text()
-                .clickEvent(ClickEvent.runCommand(cmd))
-                .hoverEvent(Component.text(cmd, color))
+                ? YELLOW
+                : GRAY;
+            NamedTextColor bgcolor = GRAY;
+            TextComponent.Builder msg = text()
+                .clickEvent(runCommand(cmd))
+                .hoverEvent(text(cmd, color))
                 .color(color)
-                .append(Component.text("[", bgcolor))
-                .append(Component.text("\u21F2", NamedTextColor.GOLD))
-                .append(Component.text("" + ticket.getId()))
-                .append(Component.text("] ", bgcolor))
-                .append(Component.text(ticket.getOwnerName()));
+                .append(text("[", bgcolor))
+                .append(text("\u21F2", GOLD))
+                .append(text("" + ticket.getId()))
+                .append(text("] ", bgcolor))
+                .append(text(ticket.getOwnerName()));
             if (ticket.isAssigned()) {
-                msg.append(Component.text(" \u2192 ", bgcolor)); // rightwards arrow
-                msg.append(Component.text(ticket.getAssigneeName()));
+                msg.append(text(" \u2192 ", bgcolor)); // rightwards arrow
+                msg.append(text(ticket.getAssigneeName()));
             }
-            msg.append(Component.text(": ", bgcolor))
-                .append(Component.text(ticket.getShortMessage()));
+            msg.append(text(": ", bgcolor))
+                .append(text(ticket.getShortMessage()));
             lines.add(msg.build());
         }
-        sender.sendMessage(Component.join(JoinConfiguration.separator(Component.newline()), lines));
+        sender.sendMessage(join(separator(newline()), lines));
     }
 
     private void viewTicket(CommandSender sender, String[] args) {
@@ -503,7 +507,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
 
     private void portTicketCallback(final Player player, final Ticket ticket, final Location location) {
         if (location == null) {
-            player.sendMessage(Component.text("Ticket location not found.", NamedTextColor.RED));
+            player.sendMessage(text("Ticket location not found.", RED));
             return;
         }
         player.teleport(location);
@@ -539,11 +543,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         Ticket ticket = ticketById(args[0]);
         PlayerCache playerCache = PlayerCache.forArg(args[1]);
         if (playerCache == null) {
-            sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
+            sender.sendMessage(text("Player not found: " + args[1], RED));
             return;
         }
         if (!Perm.get().has(playerCache.uuid, "ticket.moderation")) {
-            sender.sendMessage(Component.text("Player not a ticket moderator: " + playerCache.name, NamedTextColor.RED));
+            sender.sendMessage(text("Player not a ticket moderator: " + playerCache.name, RED));
             return;
         }
         ticket.setAssignee(playerCache);
@@ -591,8 +595,8 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         new TicketEvent(TicketEvent.Action.DELETE, ticket, sender).call();
         int ticketCount = db.find(Ticket.class).eq("id", ticket.getId()).delete();
         int commentCount = db.find(Comment.class).eq("ticket_id", ticket.getId()).delete();
-        sender.sendMessage(Component.text("Deleted ticket #" + ticket.getId() + ": " + ticketCount + " tickets, " + commentCount + " comments",
-                                          NamedTextColor.YELLOW));
+        sender.sendMessage(text("Deleted ticket #" + ticket.getId() + ": " + ticketCount + " tickets, " + commentCount + " comments",
+                                YELLOW));
     }
 
     public void reminder() {
@@ -631,26 +635,26 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             if (player == null) continue;
             Ticket ticket = entry.getValue();
             String cmd = "/ticket view " + ticket.getId();
-            player.sendMessage(Component.text()
+            player.sendMessage(text()
                                .content("Ticket [")
-                               .color(NamedTextColor.YELLOW)
-                               .append(Component.text("" + ticket.getId(), NamedTextColor.GOLD))
-                               .append(Component.text("] by " + ticket.getOwnerName() + " has an update! Click for more info."))
-                               .hoverEvent(HoverEvent.showText(Component.text(cmd, NamedTextColor.YELLOW)))
-                               .clickEvent(ClickEvent.runCommand(cmd)));
+                               .color(YELLOW)
+                               .append(text("" + ticket.getId(), GOLD))
+                               .append(text("] by " + ticket.getOwnerName() + " has an update! Click for more info."))
+                               .hoverEvent(showText(text(cmd, YELLOW)))
+                               .clickEvent(runCommand(cmd)));
         }
         for (Map.Entry<UUID, Ticket> entry : ownerUpdates.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player == null) continue;
             Ticket ticket = entry.getValue();
             String cmd = "/ticket view " + ticket.getId();
-            player.sendMessage(Component.text()
+            player.sendMessage(text()
                                .content("Ticket [")
-                               .color(NamedTextColor.DARK_AQUA)
-                               .append(Component.text("" + ticket.getId(), NamedTextColor.AQUA))
-                               .append(Component.text("] has an update for you! Click here for more info."))
-                               .hoverEvent(HoverEvent.showText(Component.text(cmd, NamedTextColor.YELLOW)))
-                               .clickEvent(ClickEvent.runCommand(cmd)));
+                               .color(DARK_AQUA)
+                               .append(text("" + ticket.getId(), AQUA))
+                               .append(text("] has an update for you! Click here for more info."))
+                               .hoverEvent(showText(text(cmd, YELLOW)))
+                               .clickEvent(runCommand(cmd)));
         }
     }
 
