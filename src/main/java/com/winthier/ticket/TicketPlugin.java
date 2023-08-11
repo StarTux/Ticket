@@ -614,6 +614,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     private void reminderCallback(List<Ticket> tickets) {
         if (tickets.size() == 0) return;
         int unassigned = 0;
+        int unassignedTicketId = 0;
         Map<UUID, Ticket> adminUpdates = new HashMap<>();
         Map<UUID, Ticket> ownerUpdates = new HashMap<>();
         for (Ticket ticket : tickets) {
@@ -624,6 +625,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                 }
             } else {
                 unassigned += 1;
+                unassignedTicketId = ticket.getId();
             }
             if (ticket.isUpdated() && ticket.getOwnerUuid() != null) {
                 ownerUpdates.put(ticket.getOwnerUuid(), ticket);
@@ -632,8 +634,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (unassigned > 1) {
             notify("There are " + unassigned + " unassigned tickets. Please attend to them.");
         } else if (unassigned == 1) {
-            final int id = tickets.get(0).getId();
-            notify(id, "There is an unassigned ticket. Please attend to it.");
+            notify(unassignedTicketId, "There is an unassigned ticket. Please attend to it.");
         }
         for (Map.Entry<UUID, Ticket> entry : adminUpdates.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
