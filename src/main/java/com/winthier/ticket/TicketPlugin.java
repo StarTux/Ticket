@@ -209,6 +209,13 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         for (int i = beginIndex + 1; i < args.length; ++i) {
             sb.append(" ").append(args[i]);
         }
+        final int len = sb.length();
+        for (int i = 0; i < len; i += 1) {
+            int c = (int) sb.charAt(i);
+            if (c >= 0x0200 || c == 0x00A7) {
+                sb.setCharAt(i, '?');
+            }
+        }
         return sb.toString();
     }
 
