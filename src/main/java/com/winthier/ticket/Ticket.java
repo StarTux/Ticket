@@ -1,11 +1,13 @@
 package com.winthier.ticket;
 
 import com.cavetale.core.playercache.PlayerCache;
+import com.cavetale.core.worlds.Worlds;
 import com.winthier.sql.SQLRow;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
@@ -15,7 +17,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.util.NumberConversions;
@@ -127,10 +128,12 @@ public final class Ticket implements SQLRow {
     /**
      * @return the location or null if world not found
      */
-    public Location getLocation() {
-        World world = Bukkit.getServer().getWorld(worldName);
-        if (world == null) return null;
-        return new Location(world, x, y, z, yaw, pitch);
+    public void getLocation(Consumer<Location> callback) {
+        Worlds.get().loadWorld(worldName, world -> {
+                callback.accept(world != null
+                                ? new Location(world, x, y, z, yaw, pitch)
+                                : null);
+            });
     }
 
     public void setLocation(Location location) {

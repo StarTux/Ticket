@@ -498,8 +498,14 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             return;
         }
         // Try location.
-        Location location = ticket.getLocation();
-        if (location == null) throw new CommandException("Ticket location not found.");
+        ticket.getLocation(location -> portTicketCallback(player, ticket, location));
+    }
+
+    private void portTicketCallback(final Player player, final Ticket ticket, final Location location) {
+        if (location == null) {
+            player.sendMessage(Component.text("Ticket location not found.", NamedTextColor.RED));
+            return;
+        }
         player.teleport(location);
         Util.sendMessage(player, "&bPorted to ticket &3[&b%d&3]&b.", ticket.getId());
         //Util.sendMessage(player, ticket.getInfo());
@@ -508,7 +514,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         ticket.setAssignee(player);
         ticket.setUpdated(true);
         ticket.setAssigneeUpdate(false);
-        if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).call()) return;
+        if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, player).call()) return;
         db.updateAsync(ticket, null, "assignee_name", "assignee_uuid", "updated", "assignee_update");
         Player owner = ticket.getOwner();
         if (owner != null) {
@@ -518,7 +524,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                                                "/ticket view " + ticket.getId()));
         }
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), sender, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
+            notify(ticket.getId(), player, "&e%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
