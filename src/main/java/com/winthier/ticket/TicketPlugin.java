@@ -668,13 +668,11 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         if (player.hasPermission("ticket.moderation")) {
-            db.find(Ticket.class).where().eq("open", true).isNull("assignee_name").findRowCountAsync((tickets) -> {
-                    if (tickets == 0) {
-                        return;
-                    } else if (tickets > 1) {
-                        Util.sendMessage(player, "&eThere are %d open tickets. Please attend to them.", tickets);
-                    } else {
-                        Util.sendMessage(player, "&eThere is an open ticket. Please attend to it.");
+            db.find(Ticket.class).where().eq("open", true).isNull("assignee_name").findRowCountAsync(unassigned -> {
+                    if (unassigned > 1) {
+                        notify("There are " + unassigned + " unassigned tickets. Please attend to them.");
+                    } else if (unassigned == 1) {
+                        notify("There is an unassigned ticket. Please attend to it.");
                     }
                 });
         }
