@@ -31,6 +31,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import static com.cavetale.mytems.util.Text.wrapLore;
 import static net.kyori.adventure.text.Component.join;
 import static net.kyori.adventure.text.Component.newline;
 import static net.kyori.adventure.text.Component.text;
@@ -259,9 +260,12 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                 ? YELLOW
                 : GRAY;
             NamedTextColor bgcolor = GRAY;
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(text(cmd, color));
+            tooltip.addAll(wrapLore(ticket.getOwnerName() + ": " + ticket.getMessage(), c -> c.color(GRAY)));
             TextComponent.Builder msg = text()
                 .clickEvent(runCommand(cmd))
-                .hoverEvent(text(cmd, color))
+                .hoverEvent(showText(join(separator(newline()), tooltip)))
                 .color(color)
                 .append(text("[", bgcolor))
                 .append(text("\u21F2", GOLD))

@@ -8,7 +8,7 @@ description: Ticket system
 author: StarTux
 website: https://cavetale.com
 
-depend: [Core, SQL]
+depend: [Core, SQL, Mytems]
 softdepend: []
 
 commands:
