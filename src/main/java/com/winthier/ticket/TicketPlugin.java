@@ -269,12 +269,12 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                 .color(color)
                 .append(text("[", bgcolor))
                 .append(text("\u21F2", GOLD))
-                .append(text("" + ticket.getId()))
+                .append(text(ticket.getId(), ticket.isAssigned() ? GRAY : YELLOW))
                 .append(text("] ", bgcolor))
                 .append(text(ticket.getOwnerName()));
             if (ticket.isAssigned()) {
-                msg.append(text(" \u2192 ", bgcolor)); // rightwards arrow
-                msg.append(text(ticket.getAssigneeName()));
+                msg.append(text(" \u2192", GREEN)); // rightwards arrow
+                msg.append(text(ticket.getAssigneeName(), WHITE));
             }
             msg.append(text(": ", bgcolor))
                 .append(text(ticket.getShortMessage()));
