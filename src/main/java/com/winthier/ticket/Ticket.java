@@ -234,7 +234,7 @@ public final class Ticket implements SQLRow {
                         .hoverEvent(showText(textOfChildren(text("Click to comment on this ticket.", DARK_AQUA),
                                                             newline(),
                                                             text("Leave your message in chat.", DARK_AQUA))))
-                        .clickEvent(runCommand("/ticket comment " + id + " "))
+                        .clickEvent(suggestCommand("/ticket comment " + id + " "))
                         .insertion("/ticket comment " + id + " "));
         }
         if (isOpen() && sender.hasPermission("ticket.assign")) {
