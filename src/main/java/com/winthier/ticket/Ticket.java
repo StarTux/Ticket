@@ -15,11 +15,22 @@ import javax.persistence.Index;
 import javax.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.util.NumberConversions;
+import static net.kyori.adventure.text.Component.join;
+import static net.kyori.adventure.text.Component.newline;
+import static net.kyori.adventure.text.Component.space;
+import static net.kyori.adventure.text.Component.text;
+import static net.kyori.adventure.text.Component.textOfChildren;
+import static net.kyori.adventure.text.JoinConfiguration.separator;
+import static net.kyori.adventure.text.event.ClickEvent.runCommand;
+import static net.kyori.adventure.text.event.ClickEvent.suggestCommand;
+import static net.kyori.adventure.text.event.HoverEvent.showText;
+import static net.kyori.adventure.text.format.NamedTextColor.*;
 
 @Entity @Getter @Setter
 @Table(name = "tickets",
@@ -206,45 +217,66 @@ public final class Ticket implements SQLRow {
     }
 
     public void sendOptions(CommandSender sender) {
-        if (!(sender instanceof Player)) return;
-        Player player = (Player) sender;
-        List<Object> json = new ArrayList<>();
+        if (!(sender instanceof Player player)) return;
+        final List<Component> buttons = new ArrayList<>();
         if (sender.hasPermission("ticket.view") && (sender.hasPermission("ticket.view.any") || isOwner(sender))) {
-            json.add(" ");
-            json.add(Util.commandRunButton("&3[&a\u21BB &bRefresh&3]", "&3Click to refresh the view", "/ticket view " + id));
+            buttons.add(textOfChildren(text("[", DARK_AQUA),
+                                       text("\u21bb", GREEN), text(" Refresh", AQUA),
+                                       text("]", DARK_AQUA))
+                        .hoverEvent(showText(text("Click to refresh the view", DARK_AQUA)))
+                        .clickEvent(runCommand("/ticket view " + id))
+                        .insertion("/ticket view " + id));
         }
         if (isOpen() && sender.hasPermission("ticket.comment") && (sender.hasPermission("ticket.comment.any") || isOwner(sender))) {
-            json.add(" ");
-            json.add(Util.commandSuggestButton("&3[&a\u270E &bComment&3]",
-                                               "&3Click to comment on this ticket.\n&3Leave your message in chat.",
-                                               "/ticket comment " + id + " "));
+            buttons.add(textOfChildren(text("[", DARK_AQUA),
+                                       text("\u270e", YELLOW), text(" Comments", AQUA),
+                                       text("]", DARK_AQUA))
+                        .hoverEvent(showText(textOfChildren(text("Click to comment on this ticket.", DARK_AQUA),
+                                                            newline(),
+                                                            text("Leave your message in chat.", DARK_AQUA))))
+                        .clickEvent(runCommand("/ticket comment " + id + " "))
+                        .insertion("/ticket comment " + id + " "));
         }
         if (isOpen() && sender.hasPermission("ticket.assign")) {
-            json.add(" ");
-            json.add(Util.commandSuggestButton("&3[&9\u27A5 &bAssign&3]",
-                                               "&3Click to assign this ticket.\n&3Type the target in chat.",
-                                               "/ticket assign " + id + " "));
+            buttons.add(textOfChildren(text("[", DARK_AQUA),
+                                       text("\u27a5", BLUE), text(" Assign", AQUA),
+                                       text("]", DARK_AQUA))
+                        .hoverEvent(showText(textOfChildren(text("Click to assign this ticket.", DARK_AQUA),
+                                                            newline(),
+                                                            text("Type the target in chat.", DARK_AQUA))))
+                        .clickEvent(suggestCommand("/ticket assign " + id + " "))
+                        .insertion("/ticket assign " + id + " "));
         }
         if (isOpen() && sender.hasPermission("ticket.close") && (sender.hasPermission("ticket.close.any") || isOwner(sender))) {
-            json.add(" ");
-            json.add(Util.commandSuggestButton("&3[&4\u2716 &bClose&3]",
-                                               "&3Click to close this ticket.\n&3Don't forget to type a reason.",
-                                               "/ticket close " + id + " "));
+            buttons.add(textOfChildren(text("[", DARK_AQUA),
+                                       text("\u2716", DARK_RED), text(" Close", AQUA),
+                                       text("]", DARK_AQUA))
+                        .hoverEvent(showText(textOfChildren(text("Click to close this ticket.", DARK_AQUA),
+                                                            newline(),
+                                                            text("Don't forget to type a reason.", DARK_AQUA))))
+                        .clickEvent(suggestCommand("/ticket close " + id + " "))
+                        .insertion("/ticket close " + id + " "));
         }
         if (!isOpen() && sender.hasPermission("ticket.reopen") && (sender.hasPermission("ticket.reopen.any") || isOwner(sender))) {
-            json.add(" ");
-            json.add(Util.commandSuggestButton("&3[&8\u2672 &bReopen&3]",
-                                               "&3Click to re-open this ticket.\n&3Don't forget to type a reason.",
-                                               "/ticket reopen " + id + " "));
+            buttons.add(textOfChildren(text("[", DARK_AQUA),
+                                       text("\u2672", DARK_GRAY), text(" Reopen", AQUA),
+                                       text("]", DARK_AQUA))
+                        .hoverEvent(showText(textOfChildren(text("Click to re-open this ticket.", DARK_AQUA),
+                                                            newline(),
+                                                            text("Don't forget to type a reason.", DARK_AQUA))))
+                        .clickEvent(suggestCommand("/ticket reopen " + id + " "))
+                        .insertion("/ticket reopen " + id + " "));
         }
         if (sender.hasPermission("ticket.port")) {
-            json.add(" ");
-            json.add(Util.commandRunButton("&3[&e\u21B7 &bPort&3]",
-                                           "&3Click to port to this ticket.",
-                                           "/ticket port " + id));
+            buttons.add(textOfChildren(text("[", DARK_AQUA),
+                                       text("\u21b7", YELLOW), text(" Port", AQUA),
+                                       text("]", DARK_AQUA))
+                        .hoverEvent(showText(text("Click to port to this ticket.", DARK_AQUA)))
+                        .clickEvent(runCommand("/ticket port " + id))
+                        .insertion("/ticket port " + id));
         }
-        if (json.isEmpty()) return;
-        Util.tellRaw(player, json);
+        if (buttons.isEmpty()) return;
+        player.sendMessage(textOfChildren(space(), join(separator(space()), buttons)));
     }
 
     public String getInfo() {

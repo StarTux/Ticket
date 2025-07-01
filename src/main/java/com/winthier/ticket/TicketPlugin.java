@@ -35,8 +35,10 @@ import static com.cavetale.mytems.util.Text.wrapLore;
 import static net.kyori.adventure.text.Component.join;
 import static net.kyori.adventure.text.Component.newline;
 import static net.kyori.adventure.text.Component.text;
+import static net.kyori.adventure.text.Component.textOfChildren;
 import static net.kyori.adventure.text.JoinConfiguration.separator;
 import static net.kyori.adventure.text.event.ClickEvent.runCommand;
+import static net.kyori.adventure.text.event.ClickEvent.suggestCommand;
 import static net.kyori.adventure.text.event.HoverEvent.showText;
 import static net.kyori.adventure.text.format.NamedTextColor.*;
 
@@ -230,11 +232,15 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             if (ticket.isOpen() || ticket.isUpdated()) opens.add(ticket);
         }
         if (opens.isEmpty()) {
-            Util.tellRaw(player, Arrays.asList(new Object[] {
-                        Util.format("&3Need staff assistance? Click here: "),
-                        Util.commandSuggestButton("&3[&a\u270E &bNew Ticket&3]",
-                                                  "&3Click here to make a new ticket.\n&3Leave a message in chat.", "/ticket new "),
-                    }));
+            player.sendMessage(textOfChildren(text("Need staff assistance? Click here: ", DARK_AQUA),
+                                              textOfChildren(text("[", DARK_AQUA),
+                                                             text("\u270e", GREEN), text(" New Ticket", AQUA),
+                                                             text("]", DARK_AQUA))
+                                              .hoverEvent(showText(textOfChildren(text("Click here to make a new ticket.", DARK_AQUA),
+                                                                                  newline(),
+                                                                                  text("Leave a message in chat.", DARK_AQUA))))
+                                              .clickEvent(suggestCommand("/ticket new "))
+                                              .insertion("/ticket new ")));
         } else {
             Util.sendMessage(player, "&3You have %d open ticket(s). Click below to view.", opens.size());
             for (Ticket ticket : opens) {

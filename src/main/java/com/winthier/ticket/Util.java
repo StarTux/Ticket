@@ -84,10 +84,6 @@ public final class Util {
         return commandButton(label, tooltip, command, true);
     }
 
-    public static Object commandSuggestButton(String label, String tooltip, String command) {
-        return commandButton(label, tooltip, command, false);
-    }
-
     public static void tellRaw(Player player, Object raw) {
         String json = GSON.toJson(raw);
         Bukkit.getServer().dispatchCommand(Bukkit.getServer().getConsoleSender(), "minecraft:tellraw " + player.getName() + " " + json);
