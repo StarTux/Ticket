@@ -5,7 +5,6 @@ import com.winthier.ticket.Ticket;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
@@ -62,10 +61,5 @@ public final class TicketEvent extends Event implements Cancellable {
 
     public boolean hasPlayer() {
         return player != null;
-    }
-
-    public boolean call() {
-        Bukkit.getPluginManager().callEvent(this);
-        return !cancelled;
     }
 }

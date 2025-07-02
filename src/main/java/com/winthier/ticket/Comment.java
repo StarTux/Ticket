@@ -53,8 +53,4 @@ public final class Comment implements SQLRow {
         }
         return commenterName;
     }
-
-    public String getInfo() {
-        return Util.format("&b%s&3:&7 %s", commenterName, comment);
-    }
 }

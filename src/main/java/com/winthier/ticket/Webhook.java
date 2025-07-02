@@ -1,5 +1,6 @@
 package com.winthier.ticket;
 
+import com.cavetale.core.util.Json;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -28,7 +29,7 @@ public final class Webhook {
             .version(HttpClient.Version.HTTP_2)
             .connectTimeout(Duration.ofSeconds(10))
             .build();
-        final String body = Util.GSON.toJson(webhookObject);
+        final String body = Json.serialize(webhookObject);
         HttpRequest request = HttpRequest.newBuilder()
             .POST(BodyPublishers.ofString(body))
             .uri(URI.create(url))
@@ -51,7 +52,7 @@ public final class Webhook {
             .version(HttpClient.Version.HTTP_2)
             .connectTimeout(Duration.ofSeconds(10))
             .build();
-        final String body = Util.GSON.toJson(webhookObject);
+        final String body = Json.serialize(webhookObject);
         HttpRequest request = HttpRequest.newBuilder()
             .POST(BodyPublishers.ofString(body))
             .uri(URI.create(url))
@@ -73,7 +74,7 @@ public final class Webhook {
             .version(HttpClient.Version.HTTP_2)
             .connectTimeout(Duration.ofSeconds(10))
             .build();
-        final String body = Util.GSON.toJson(webhookObject);
+        final String body = Json.serialize(webhookObject);
         HttpRequest request = HttpRequest.newBuilder()
             .POST(BodyPublishers.ofString(body))
             .uri(URI.create(url))

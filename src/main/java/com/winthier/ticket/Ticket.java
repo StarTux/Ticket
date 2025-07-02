@@ -26,6 +26,7 @@ import static net.kyori.adventure.text.Component.newline;
 import static net.kyori.adventure.text.Component.space;
 import static net.kyori.adventure.text.Component.text;
 import static net.kyori.adventure.text.Component.textOfChildren;
+import static net.kyori.adventure.text.JoinConfiguration.noSeparators;
 import static net.kyori.adventure.text.JoinConfiguration.separator;
 import static net.kyori.adventure.text.event.ClickEvent.runCommand;
 import static net.kyori.adventure.text.event.ClickEvent.suggestCommand;
@@ -179,34 +180,35 @@ public final class Ticket implements SQLRow {
     }
 
     public void sendShortInfo(CommandSender sender, boolean verbose) {
-        if (sender instanceof Player) {
-            String infoMessage = this.getMessage();
-            if (infoMessage.length() > 24) {
-                infoMessage = infoMessage.substring(0, 24) + "...";
-            }
-            List<Object> json = new ArrayList<>();
-            json.add(" ");
-            json.add(Util.commandRunButton("&3[&a\u21F2 &b" + id + "&3]", "&3Click to view this ticket", "/ticket view " + id));
-            if (verbose) {
-                json.add(Util.format(" &3(&b%s&3)", serverName));
-            }
-            if (assigneeName == null) {
-                json.add(Util.format(" &b%s&3:&7 %s", ownerName, infoMessage));
-            } else {
-                json.add(Util.format(" &b%s&3 => &b%s&3: &7%s", ownerName, assigneeName, infoMessage));
-            }
-            Util.tellRaw((Player) sender, json);
-        } else {
-            String infoMessage = this.message;
-            if (infoMessage.length() > 24) {
-                infoMessage = infoMessage.substring(0, 24) + "...";
-            }
-            if (assigneeName == null) {
-                Util.sendMessage(sender, "&3[&b%d&3] (&b%s&3) &b%s&3:&7 %s", id, serverName, ownerName, infoMessage);
-            } else {
-                Util.sendMessage(sender, "&3[&b%d&3] (&b%s&3) &b%s&3 => &b%s&3:&7 %s", id, serverName, ownerName, assigneeName, infoMessage);
-            }
+        String infoMessage = this.getMessage();
+        if (infoMessage.length() > 24) {
+            infoMessage = infoMessage.substring(0, 24) + "...";
         }
+        final List<Component> components = new ArrayList<>();
+        components.add(space());
+        components.add(textOfChildren(text("[", DARK_AQUA),
+                                      text("\u21f2", GREEN), text(" " + id, AQUA),
+                                      text("]", DARK_AQUA))
+                       .hoverEvent(showText(text("Click to view this ticket", DARK_AQUA)))
+                       .clickEvent(runCommand("/ticket view " + id))
+                       .insertion("/ticket view " + id));
+        if (verbose) {
+            components.add(textOfChildren(text(" (", DARK_AQUA),
+                                          text(serverName, AQUA),
+                                          text(")", DARK_AQUA)));
+        }
+        if (assigneeName == null) {
+            components.add(textOfChildren(text(" " + ownerName, AQUA),
+                                          text(":", DARK_AQUA),
+                                          text(" " + infoMessage, GRAY)));
+        } else {
+            components.add(textOfChildren(text(" " + ownerName, AQUA),
+                                          text(" => ", DARK_AQUA),
+                                          text(assigneeName, AQUA),
+                                          text(": ", DARK_AQUA),
+                                          text(infoMessage, GRAY)));
+        }
+        sender.sendMessage(join(noSeparators(), components));
     }
 
     public String getShortMessage() {
@@ -279,19 +281,35 @@ public final class Ticket implements SQLRow {
         player.sendMessage(textOfChildren(space(), join(separator(space()), buttons)));
     }
 
-    public String getInfo() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(Util.format("&3Ticket &b%d", id));
-        sb.append(Util.format("\n&3 Owner: &b%s", ownerName));
-        sb.append(Util.format("\n&3 Created: &b%s &3(%s ago)", Util.formatDate(createTime.getTime()),
-                              Util.formatInterval(System.currentTimeMillis() - createTime.getTime())));
-        sb.append(Util.format("\n&3 Message: &b%s", message));
+    public List<Component> getInfoLines() {
+        final List<Component> result = new ArrayList<>();
+        result.add(textOfChildren(text("Ticket", DARK_AQUA),
+                                  text(" " + id, AQUA)));
+        result.add(textOfChildren(text(" Owner: ", DARK_AQUA),
+                                  text(ownerName, AQUA)));
+        result.add(textOfChildren(text(" Created: ", DARK_AQUA),
+                                  text(Util.formatDate(createTime.getTime()), AQUA),
+                                  text(" (" + Util.formatInterval(System.currentTimeMillis() - createTime.getTime()) + " ago)", DARK_AQUA)));
+        result.add(textOfChildren(text(" Message: ", DARK_AQUA),
+                                  text(message, AQUA)));
         if (isAssigned()) {
-            sb.append(Util.format("\n&3 Assigned to: &b%s", assigneeName));
+            result.add(textOfChildren(text(" Assigned to: ", DARK_AQUA),
+                                      text(assigneeName, AQUA)));
         }
-        sb.append(Util.format("\n&3 Location: (&b%s&3) &b%s &b%d&3,&b%d&3,&b%d", serverName, worldName,
-                              NumberConversions.floor(x), NumberConversions.floor(y), NumberConversions.floor(z)));
-        sb.append(Util.format("\n&3 Status: &b%s", (isOpen() ? "Open" : "Closed")));
-        return sb.toString();
+        result.add(textOfChildren(text(" Location: (", DARK_AQUA),
+                                  text(serverName, AQUA),
+                                  text(") ", DARK_AQUA),
+                                  text(worldName, AQUA),
+                                  space(),
+                                  text(NumberConversions.floor(x), AQUA),
+                                  space(),
+                                  text(NumberConversions.floor(y), AQUA),
+                                  space(),
+                                  text(NumberConversions.floor(z), AQUA)));
+        result.add(textOfChildren(text(" Status: ", DARK_AQUA),
+                                  (isOpen()
+                                   ? text("Open", GREEN)
+                                   : text("Closed", DARK_RED))));
+        return result;
     }
 }

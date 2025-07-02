@@ -1,34 +1,11 @@
 package com.winthier.ticket;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import java.text.DateFormatSymbols;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 public final class Util {
     private Util() { }
-    protected static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
-
-    public static String format(String msg, Object... args) {
-        msg = ChatColor.translateAlternateColorCodes('&', msg);
-        msg = String.format(msg, args);
-        return msg;
-    }
-
-    public static String colorize(String msg) {
-        return ChatColor.translateAlternateColorCodes('&', msg);
-    }
-
-    public static void sendMessage(CommandSender sender, String msg, Object... args) {
-        sender.sendMessage(format(msg, args));
-    }
 
     public static String formatDate(long time) {
         Calendar cal = Calendar.getInstance();
@@ -62,30 +39,5 @@ public final class Util {
         if (months > 0) sb.append(months).append("m");
         if (days > 0) sb.append(days).append("d");
         return sb.toString();
-    }
-
-    public static Object commandButton(String label, String tooltip, String command, boolean run) {
-        label = colorize(label);
-        tooltip = colorize(tooltip);
-        Map<String, Object> result = new HashMap<>();
-        result.put("text", label);
-        Map<String, String> tooltipMap = new HashMap<>();
-        Map<String, String> commandMap = new HashMap<>();
-        result.put("hoverEvent", tooltipMap);
-        result.put("clickEvent", commandMap);
-        tooltipMap.put("action", "show_text");
-        tooltipMap.put("value", tooltip);
-        commandMap.put("action", run ? "run_command" : "suggest_command");
-        commandMap.put("value", command);
-        return result;
-    }
-
-    public static Object commandRunButton(String label, String tooltip, String command) {
-        return commandButton(label, tooltip, command, true);
-    }
-
-    public static void tellRaw(Player player, Object raw) {
-        String json = GSON.toJson(raw);
-        Bukkit.getServer().dispatchCommand(Bukkit.getServer().getConsoleSender(), "minecraft:tellraw " + player.getName() + " " + json);
     }
 }

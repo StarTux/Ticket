@@ -34,6 +34,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import static com.cavetale.mytems.util.Text.wrapLore;
 import static net.kyori.adventure.text.Component.join;
 import static net.kyori.adventure.text.Component.newline;
+import static net.kyori.adventure.text.Component.space;
 import static net.kyori.adventure.text.Component.text;
 import static net.kyori.adventure.text.Component.textOfChildren;
 import static net.kyori.adventure.text.JoinConfiguration.separator;
@@ -57,7 +58,6 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                                   SQLWebhook.class));
         db.createAllTables();
         getServer().getPluginManager().registerEvents(this, this);
-        getCommand("ticket").setUsage(Util.format(getCommand("ticket").getUsage()));
         Bukkit.getScheduler().runTaskTimer(this, this::reminder, 0L, 20L * 60L * 5L);
     }
 
@@ -73,13 +73,16 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     private void sendUsageMessage(CommandSender sender, String key) {
-        if (sender.hasPermission("ticket." + key)) Util.sendMessage(sender, "&3Usage: " + getUsageMessage(key));
+        if (sender.hasPermission("ticket." + key)) sender.sendMessage(text("Usage: " + getUsageMessage(key), DARK_AQUA));
     }
 
     private void sendUsageMessage(CommandSender sender) {
-        Util.sendMessage(sender, "&3Ticket usage:");
+        sender.sendMessage(text("Ticket usage:", DARK_AQUA));
         for (String key : Arrays.asList("new", "view", "comment", "close", "reopen", "port", "assign", "reload", "reminder", "delete")) {
-            if (sender.hasPermission("ticket." + key)) Util.sendMessage(sender, " " + getUsageMessage(key));
+            if (!sender.hasPermission("ticket." + key)) {
+                continue;
+            }
+            sender.sendMessage(text(" " + getUsageMessage(key), DARK_AQUA));
         }
     }
 
@@ -164,7 +167,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         } catch (UsageException ue) {
             sendUsageMessage(sender, ue.getKey());
         } catch (CommandException ce) {
-            Util.sendMessage(sender, "&c%s", ce.getMessage());
+            sender.sendMessage(text(ce.getMessage(), RED));
         }
         return true;
     }
@@ -242,7 +245,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
                                               .clickEvent(suggestCommand("/ticket new "))
                                               .insertion("/ticket new ")));
         } else {
-            Util.sendMessage(player, "&3You have %d open ticket(s). Click below to view.", opens.size());
+            player.sendMessage(text("You have " + opens.size() + " open ticket(s). Click below to view.", DARK_AQUA));
             for (Ticket ticket : opens) {
                 ticket.sendShortInfo(player, false);
             }
@@ -294,18 +297,23 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (args.length != 1) throw new UsageException("view");
         Ticket ticket = ticketById(args[0]);
         if (!ticket.isOwner(sender)) assertPermission(sender, "ticket.view.any");
-        if (!new TicketEvent(TicketEvent.Action.VIEW, ticket, sender).call()) {
+        if (!new TicketEvent(TicketEvent.Action.VIEW, ticket, sender).callEvent()) {
             return;
         }
         List<Comment> comments = db.find(Comment.class).where().eq("ticketId", ticket.getId()).orderByAscending("id").findList();
-        StringBuilder sb = new StringBuilder(ticket.getInfo());
+        for (Component line : ticket.getInfoLines()) {
+            sender.sendMessage(line);
+        }
         if (!comments.isEmpty()) {
-            sb.append(Util.format("\n&3 Comments: &b%d", comments.size()));
+            sender.sendMessage(textOfChildren(text(" Comments: ", DARK_AQUA),
+                                              text(comments.size(), AQUA)));
             for (Comment comment : comments) {
-                sb.append("\n ").append(comment.getInfo());
+                sender.sendMessage(textOfChildren(space(),
+                                                  text(comment.getCommenterName(), AQUA),
+                                                  text(": ", DARK_AQUA),
+                                                  text(comment.getComment(), GRAY)));
             }
         }
-        sender.sendMessage(sb.toString());
         if (ticket.isOwner(sender) && ticket.isUpdated()) {
             ticket.setUpdated(false);
             db.updateAsync(ticket, null, "updated");
@@ -326,26 +334,28 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         int ticketCount = db.find(Ticket.class).where().eq("ownerUuid", player.getUniqueId()).eq("open", true).findRowCount();
         assertCommand(ticketCount < 3, "You already have %d open tickets.", ticketCount);
         Ticket ticket = new Ticket(getServerName(), player, compileMessage(args, 0));
-        if (!new TicketEvent(TicketEvent.Action.CREATE, ticket, sender).call()) {
+        if (!new TicketEvent(TicketEvent.Action.CREATE, ticket, sender).callEvent()) {
             return;
         }
         db.insertAsync(ticket, result -> newTicketCallback(sender, ticket, result));
     }
 
     private void newTicketCallback(CommandSender sender, Ticket ticket, int insertResult) {
-        new TicketEvent(TicketEvent.Action.CREATED, ticket, sender).call();
-        if (sender instanceof Player) {
-            int id = ticket.getId();
-            Util.tellRaw((Player) sender, Arrays
-                         .asList(Util.format("&bTicket "),
-                                 Util.commandRunButton("&3[&a\u21F2 &b" + id + "&3]", "&3Click to view the ticket", "/ticket view " + id),
-                                 Util.format("&b created: &7%s", ticket.getMessage())
-                                 ));
-        } else {
-            Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b created: &7%s", ticket.getId(), ticket.getMessage());
-        }
+        new TicketEvent(TicketEvent.Action.CREATED, ticket, sender).callEvent();
+        final int id = ticket.getId();
+        sender.sendMessage(textOfChildren(text("Ticket", AQUA),
+                                          space(),
+                                          (textOfChildren(text("[", DARK_AQUA),
+                                                          text("\u21f2 ", GREEN),
+                                                          text(id, AQUA),
+                                                          text("]", DARK_AQUA))
+                                           .hoverEvent(showText(text("Click to view the ticket", DARK_AQUA)))
+                                           .clickEvent(runCommand("/ticket view " + id))
+                                           .insertion("/ticket view " + id)),
+                                          text(" created: ", AQUA),
+                                          text(ticket.getMessage(), GRAY)));
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), "%s created ticket [%d]: %s", ticket.getOwnerName(), ticket.getId(), ticket.getMessage());
+            notify(ticket.getId(), text(ticket.getOwnerName() + " created ticket [" + ticket.getId() + "]: " + ticket.getMessage(), YELLOW));
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket);
@@ -362,7 +372,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         String message = compileMessage(args, 1);
         if (!ticket.isOwner(sender)) assertPermission(sender, "ticket.comment.any");
         Comment comment = new Comment(ticket.getId(), sender, message);
-        if (!new TicketEvent(TicketEvent.Action.COMMENT, ticket, sender, comment).call()) {
+        if (!new TicketEvent(TicketEvent.Action.COMMENT, ticket, sender, comment).callEvent()) {
             return;
         }
         db.insertAsync(comment, result -> commentTicketCallback(sender, ticket, comment, result));
@@ -373,25 +383,35 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
      * accordingly.
      */
     private void commentTicketCallback(CommandSender sender, Ticket ticket, Comment comment, int insertResult) {
-        Util.sendMessage(sender, "&bCommented on ticket &3[&b%d&3]&b: &7%s", ticket.getId(), comment.getComment());
+        sender.sendMessage(textOfChildren(text("Commented on ticket ", AQUA),
+                                          text("[", DARK_AQUA),
+                                          text(ticket.getId(), AQUA),
+                                          text("]", DARK_AQUA),
+                                          text(": ", AQUA),
+                                          text(comment.getComment(), GRAY)));
         if (ticket.isOwner(sender)) {
             ticket.setAssigneeUpdate(true);
             db.updateAsync(ticket, null, "assignee_update");
         } else {
             ticket.setUpdated(true);
             db.updateAsync(ticket, null, "updated");
-            Player owner = ticket.getOwner();
+            final Player owner = ticket.getOwner();
             if (owner != null) {
-                Util.tellRaw(owner,
-                             Util.commandRunButton("&3" + comment.getCommenterName() + " commented on your ticket [&b"
-                                                   + ticket.getId() + "&3]: &7" + comment.getComment(),
-                                                   "&3Click to view this ticket",
-                                                   "/ticket view " + ticket.getId()));
+                owner.sendMessage(textOfChildren(text("New commented on your ticket ", DARK_AQUA),
+                                                 text("[", DARK_AQUA),
+                                                 text(ticket.getId(), AQUA),
+                                                 text("]", DARK_AQUA),
+                                                 text(" " + comment.getCommenterName(), AQUA),
+                                                 text(": ", DARK_AQUA),
+                                                 text(comment.getComment(), GRAY))
+                                  .hoverEvent(showText(text("Click to view this ticket", DARK_AQUA)))
+                                  .clickEvent(runCommand("/ticket view " + ticket.getId()))
+                                  .insertion("/ticket view " + ticket.getId()));
             }
         }
         if (!ticket.isSilent()) {
             if (!ticket.isAssigned()) {
-                notify(ticket.getId(), "%s commented on ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), comment.getComment());
+                notify(ticket.getId(), text(comment.getCommenterName() + " commented on ticket [" + comment.getTicketId() + "]: " + comment.getComment(), YELLOW));
             }
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
@@ -417,7 +437,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             message = "Closed";
         }
         Comment comment = new Comment(ticket.getId(), sender, message);
-        if (!new TicketEvent(TicketEvent.Action.CLOSE, ticket, sender, comment).call()) {
+        if (!new TicketEvent(TicketEvent.Action.CLOSE, ticket, sender, comment).callEvent()) {
             return;
         }
         db.insertAsync(comment, result -> closeTicketCallback(sender, ticket, comment, cMessage, result));
@@ -433,16 +453,24 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             db.updateAsync(ticket, null, "open", "updated");
             Player owner = ticket.getOwner();
             if (owner != null) {
-                Util.tellRaw(owner,
-                             Util.commandRunButton("&3" + comment.getCommenterName() + " closed your ticket [&b"
-                                                   + ticket.getId() + "&3]: &7" + comment.getComment(),
-                                                   "&3Click to view this ticket",
-                                                   "/ticket view " + ticket.getId()));
+                owner.sendMessage(textOfChildren(text(comment.getCommenterName() + " closed your ticket "),
+                                                 text("[", DARK_AQUA),
+                                                 text(ticket.getId(), AQUA),
+                                                 text("]: ", DARK_AQUA),
+                                                 text(comment.getComment(), GRAY))
+                                  .hoverEvent(showText(text("Click to view this ticket", DARK_AQUA)))
+                                  .clickEvent(runCommand("/ticket view " + ticket.getId()))
+                                  .insertion("/ticket view " + ticket.getId()));
             }
         }
-        Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b closed: &7%s", ticket.getId(), cMessage);
+        sender.sendMessage(textOfChildren(text("Ticket ", AQUA),
+                                          text("[", DARK_AQUA),
+                                          text(ticket.getId(), AQUA),
+                                          text("]", DARK_AQUA),
+                                          text(" closed: ", AQUA),
+                                          text(cMessage, GRAY)));
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), "%s closed ticket [%d]: %s", comment.getCommenterName(), comment.getTicketId(), cMessage);
+            notify(ticket.getId(), text(comment.getCommenterName() + " closed ticket [" + comment.getTicketId() + "]: " + cMessage, YELLOW));
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Closed", comment);
@@ -467,7 +495,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             message = "Reopened";
         }
         Comment comment = new Comment(ticket.getId(), sender, message);
-        if (!new TicketEvent(TicketEvent.Action.REOPEN, ticket, sender, comment).call()) {
+        if (!new TicketEvent(TicketEvent.Action.REOPEN, ticket, sender, comment).callEvent()) {
             return;
         }
         db.insertAsync(comment, result -> reopenTicketCallback(sender, ticket, comment, cMessage, result));
@@ -483,17 +511,23 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             Player owner = ticket.getOwner();
             db.updateAsync(ticket, null, "open", "updated");
             if (owner != null) {
-                Util.tellRaw(owner,
-                             Util.commandRunButton("&3" + comment.getCommenterName() + " reopened your ticket [&b"
-                                                   + ticket.getId() + "&3]: &7" + comment.getComment(),
-                                                   "&3Click to view this ticket",
-                                                   "/ticket view " + ticket.getId()));
+                owner.sendMessage(textOfChildren(text(comment.getCommenterName() + " reopened your ticket [", DARK_AQUA),
+                                                 text(ticket.getId(), AQUA),
+                                                 text("]: ", DARK_AQUA),
+                                                 text(comment.getComment(), GRAY))
+                                  .hoverEvent(showText(text("Click to view this ticket", DARK_AQUA)))
+                                  .clickEvent(runCommand("/ticket view " + ticket.getId()))
+                                  .insertion("/ticket view " + ticket.getId()));
             }
         }
-        Util.sendMessage(sender, "&bTicket &3[&b%d&3]&b reopened: &7%s", ticket.getId(), cMessage);
+        sender.sendMessage(textOfChildren(text("Ticket ", AQUA),
+                                          text("[", DARK_AQUA),
+                                          text(ticket.getId(), AQUA),
+                                          text("]", DARK_AQUA),
+                                          text(" reopened: ", AQUA),
+                                          text(cMessage, GRAY)));
         if (!ticket.isSilent()) {
-            notify(comment.getTicketId(), "%s reopened ticket [%d]: %s",
-                   comment.getCommenterName(), comment.getTicketId(), cMessage);
+            notify(comment.getTicketId(), text(comment.getCommenterName() + " reopened ticket [" + comment.getTicketId() + "]: " + cMessage, YELLOW));
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Reopen", comment);
@@ -509,11 +543,15 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (args.length != 1) throw new UsageException("port");
         Ticket ticket = ticketById(args[0]);
         // Try server.
-        if (!new TicketEvent(TicketEvent.Action.PORT, ticket, sender).call()) {
+        if (!new TicketEvent(TicketEvent.Action.PORT, ticket, sender).callEvent()) {
             return;
         }
         if (!getServerName().equalsIgnoreCase(ticket.getServerName())) {
-            Util.sendMessage(player, "&bTicket &3[&b%d&3]&b is on server %s...", ticket.getId(), ticket.getServerName());
+            player.sendMessage(textOfChildren(text("Ticket ", AQUA),
+                                              text("[", DARK_AQUA),
+                                              text(ticket.getId(), AQUA),
+                                              text("]", DARK_AQUA),
+                                              text(" is on server " + ticket.getServerName() + "...", AQUA)));
             Bungee.send(player, ticket.getServerName());
             return;
         }
@@ -527,24 +565,28 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             return;
         }
         player.teleport(location);
-        Util.sendMessage(player, "&bPorted to ticket &3[&b%d&3]&b.", ticket.getId());
-        //Util.sendMessage(player, ticket.getInfo());
+        player.sendMessage(textOfChildren(text("Ported to ticket ", AQUA),
+                                          text("[", DARK_AQUA),
+                                          text(ticket.getId(), AQUA),
+                                          text("]", DARK_AQUA)));
         // Assign
         if (ticket.isAssigned()) return;
         ticket.setAssignee(player);
         ticket.setUpdated(true);
         ticket.setAssigneeUpdate(false);
-        if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, player).call()) return;
+        if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, player).callEvent()) return;
         db.updateAsync(ticket, null, "assignee_name", "assignee_uuid", "updated", "assignee_update");
         Player owner = ticket.getOwner();
         if (owner != null) {
-            Util.tellRaw(owner,
-                         Util.commandRunButton("&3" + player.getName() + " was assigned to your ticket [&b" + ticket.getId() + "&3]",
-                                               "&3Click to view this ticket",
-                                               "/ticket view " + ticket.getId()));
+            owner.sendMessage(textOfChildren(text(player.getName() + " was assigned to your ticket [", DARK_AQUA),
+                                             text(ticket.getId(), AQUA),
+                                             text("]", DARK_AQUA))
+                              .hoverEvent(showText(text("Click to view this ticket", DARK_AQUA)))
+                              .clickEvent(runCommand("/ticket view " + ticket.getId()))
+                              .insertion("/ticket view " + ticket.getId()));
         }
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), "%s was assigned to ticket [%d].", ticket.getAssigneeName(), ticket.getId());
+            notify(ticket.getId(), text(ticket.getAssigneeName() + " was assigned to ticket [" + ticket.getId() + "]", YELLOW));
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
@@ -568,20 +610,25 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         }
         ticket.setAssignee(playerCache);
         ticket.setAssigneeUpdate(!ticket.isAssigned(sender));
-        if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).call()) {
+        if (!new TicketEvent(TicketEvent.Action.ASSIGN, ticket, sender).callEvent()) {
             return;
         }
         db.updateAsync(ticket, null, "assignee_uuid", "assignee_name", "assignee_update");
-        Util.sendMessage(sender, "&bAssigned %s to ticket &3[&b%d&3]&b.", ticket.getAssigneeName(), ticket.getId());
+        sender.sendMessage(textOfChildren(text("Assigned " + ticket.getAssigneeName() + " to ticket ", AQUA),
+                                          text("[", DARK_AQUA),
+                                          text(ticket.getId(), AQUA),
+                                          text("]", DARK_AQUA)));
         Player owner = ticket.getOwner();
         if (owner != null) {
-            Util.tellRaw(owner,
-                         Util.commandRunButton("&3" + ticket.getAssigneeName() + " was assigned to your ticket [&b" + ticket.getId() + "&3]",
-                                               "&3Click to view this ticket",
-                                               "/ticket view " + ticket.getId()));
+            owner.sendMessage(textOfChildren(text(ticket.getAssigneeName() + " was assigned to your ticket [", DARK_AQUA),
+                                             text(ticket.getId(), AQUA),
+                                             text("]", DARK_AQUA))
+                              .hoverEvent(showText(text("Click to view this ticket", DARK_AQUA)))
+                              .clickEvent(runCommand("/ticket view " + ticket.getId()))
+                              .insertion("/ticket view " + ticket.getId()));
         }
         if (!ticket.isSilent()) {
-            notify(ticket.getId(), "%s assigned %s to ticket [%d].", sender.getName(), ticket.getAssigneeName(), ticket.getId());
+            notify(ticket.getId(), text(sender.getName() + " assigned " + ticket.getAssigneeName() + " to ticket [" + ticket.getId() + "]", YELLOW));
             db.scheduleAsyncTask(() -> {
                     for (SQLWebhook row : db.find(SQLWebhook.class).findList()) {
                         Webhook.send(this, row.getUrl(), ticket, "Assigned", "to " + ticket.getAssigneeName());
@@ -594,13 +641,13 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         assertPermission(sender, "ticket.reload");
         if (args.length > 0) throw new UsageException("reload");
         usageMessages = null;
-        Util.sendMessage(sender, "&bTicket configuration reloaded.");
+        sender.sendMessage(text("Ticket configuration reloaded", YELLOW));
     }
 
     private void reminder(CommandSender sender, String[] args) {
         assertPermission(sender, "ticket.reminder");
         if (args.length > 0) throw new UsageException("reminder");
-        Util.sendMessage(sender, "&bTriggering reminder...");
+        sender.sendMessage(text("Triggering reminder...", YELLOW));
         reminder();
     }
 
@@ -608,7 +655,7 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         assertPermission(sender, "ticket.delete");
         if (args.length != 1) throw new UsageException("delete");
         Ticket ticket = ticketById(args[0]);
-        new TicketEvent(TicketEvent.Action.DELETE, ticket, sender).call();
+        new TicketEvent(TicketEvent.Action.DELETE, ticket, sender).callEvent();
         int ticketCount = db.find(Ticket.class).eq("id", ticket.getId()).delete();
         int commentCount = db.find(Comment.class).eq("ticket_id", ticket.getId()).delete();
         sender.sendMessage(text("Deleted ticket #" + ticket.getId() + ": " + ticketCount + " tickets, " + commentCount + " comments",
@@ -642,9 +689,9 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
             }
         }
         if (unassigned > 1) {
-            notify("There are " + unassigned + " unassigned tickets. Please attend to them.");
+            notify(text("There are " + unassigned + " unassigned tickets. Please attend to them.", YELLOW));
         } else if (unassigned == 1) {
-            notify(unassignedTicketId, "There is an unassigned ticket. Please attend to it.");
+            notify(unassignedTicketId, text("There is an unassigned ticket. Please attend to it.", YELLOW));
         }
         for (Map.Entry<UUID, Ticket> entry : adminUpdates.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
@@ -680,51 +727,36 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
         if (player.hasPermission("ticket.moderation")) {
             db.find(Ticket.class).where().eq("open", true).isNull("assignee_name").findRowCountAsync(unassigned -> {
                     if (unassigned > 1) {
-                        notify("There are " + unassigned + " unassigned tickets. Please attend to them.");
+                        notify(text("There are " + unassigned + " unassigned tickets. Please attend to them.", YELLOW));
                     } else if (unassigned == 1) {
-                        notify("There is an unassigned ticket. Please attend to it.");
+                        notify(text("There is an unassigned ticket. Please attend to it.", YELLOW));
                     }
                 });
         }
         db.find(Ticket.class).where().eq("ownerUuid", player.getUniqueId()).eq("updated", true).findRowCountAsync((tickets) -> {
                 if (tickets <= 0) return;
-                Util.tellRaw(player, Arrays.asList(
-                                                   Util.format("&3There are ticket updates for you. "),
-                                                   Util.commandRunButton("&3[&bClick here&3]", "&3Click here for more info", "/ticket"),
-                                                   Util.format("&3 for more info.")
-                                                   ));
+                player.sendMessage(textOfChildren(text("There are ticket updates for you. ", DARK_AQUA),
+                                                  text("[", DARK_AQUA),
+                                                  text("Click Here", AQUA),
+                                                  text("] for more info.", DARK_AQUA))
+                                   .hoverEvent(showText(text("Click here for more info", DARK_AQUA)))
+                                   .clickEvent(runCommand(("/ticket")))
+                                   .insertion("/ticket"));
             });
     }
 
-    /**
-     * Notify all permission holders with the clickable message which
-     * views the ticket.
-     */
-    public void notify(int id, String message, Object... args) {
-        message = String.format(message, args);
-        getLogger().info("[" + id + "] " + message);
-        final String cmd = "/ticket view " + id;
-        notify(text(message, YELLOW)
-               .hoverEvent(showText(text(cmd, YELLOW)))
-               .clickEvent(runCommand(cmd))
-               .insertion(cmd));
-    }
-
-    /**
-     * Notify all permission holders with the clickable message which
-     * lists all tickets.
-     */
-    public void notify(String message, Object... args) {
-        message = String.format(message, args);
-        getLogger().info(message);
-        final String cmd = "/ticket";
-        notify(text(message, YELLOW)
-               .hoverEvent(showText(text(cmd, YELLOW)))
-               .clickEvent(runCommand(cmd))
-               .insertion(cmd));
-    }
-
     public void notify(Component message) {
+        for (Player player : getServer().getOnlinePlayers()) {
+            if (!player.hasPermission("ticket.notify")) continue;
+            player.sendMessage(message);
+        }
+    }
+
+    public void notify(int id, Component message) {
+        message = message
+            .hoverEvent(showText(text("Click to view the ticket", DARK_AQUA)))
+            .clickEvent(runCommand("/ticket view " + id))
+            .insertion("/ticket view " + id);
         for (Player player : getServer().getOnlinePlayers()) {
             if (!player.hasPermission("ticket.notify")) continue;
             player.sendMessage(message);

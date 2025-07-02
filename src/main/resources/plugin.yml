@@ -15,16 +15,16 @@ commands:
   Ticket:
     description: General purpose command interface
     usage: |-
-      &3/ticket &bnew <&oMessage&b> &8- &7Create a new ticket
-      &3/ticket &bview <&oID&b> &8- &7View ticket information
-      &3/ticket &bcomment <&oID&b> <&oMessage&b> &8- &7Comment on a ticket
-      &3/ticket &bclose <&oID&b> [&oMessage&b] &8-&7Close a ticket
-      &3/ticket &breopen <&oID&b> [&oMessage&b] &8- &7Reopen a closed ticket
-      &3/ticket &bport <&oID&b> &8- &7Port to a ticket
-      &3/ticket &bassign <&oID&b> <&oAssignee&b> &8- &7Assign a ticket
-      &3/ticket &breload &8- &7Reload configuration
-      &3/ticket &breminder &8- &7Trigger reminders
-      &3/ticket &bdelete <&oID&b> &8- &7Delete ticket
+      §3/ticket §bnew <§oMessage§b> §8- §7Create a new ticket
+      §3/ticket §bview <§oID§b> §8- §7View ticket information
+      §3/ticket §bcomment <§oID§b> <§oMessage§b> §8- §7Comment on a ticket
+      §3/ticket §bclose <§oID§b> [§oMessage§b] §8-§7Close a ticket
+      §3/ticket §breopen <§oID§b> [§oMessage§b] §8- §7Reopen a closed ticket
+      §3/ticket §bport <§oID§b> §8- §7Port to a ticket
+      §3/ticket §bassign <§oID§b> <§oAssignee§b> §8- §7Assign a ticket
+      §3/ticket §breload §8- §7Reload configuration
+      §3/ticket §breminder §8- §7Trigger reminders
+      §3/ticket §bdelete <§oID§b> §8- §7Delete ticket
     permission: ticket.ticket
 permissions:
   ticket.*:
