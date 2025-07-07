@@ -746,6 +746,10 @@ public final class TicketPlugin extends JavaPlugin implements Listener {
     }
 
     public void notify(Component message) {
+        message = message
+            .hoverEvent(showText(text("Click to view tickets", DARK_AQUA)))
+            .clickEvent(runCommand("/ticket"))
+            .insertion("/ticket");
         for (Player player : getServer().getOnlinePlayers()) {
             if (!player.hasPermission("ticket.notify")) continue;
             player.sendMessage(message);
